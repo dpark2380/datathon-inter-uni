@@ -1,0 +1,4 @@
+[dependency-groups]
+dev = [
+    "scikit-learn>=1.9.0",
+]
