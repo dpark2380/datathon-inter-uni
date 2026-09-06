@@ -174,12 +174,46 @@ def fit_full(seq_tr, st_tr, y_tr, seq_te, st_te, seed, epochs, make_model=None):
         return torch.sigmoid(model(t(seq_te), t(st_te))).cpu().numpy()
 
 
+def preprocessors(X, seq_all, rows):
+    """Fit the static-feature and sequence-channel transforms on `rows` only.
+
+    Returns (static, norm): `static` turns a feature frame into the scaled,
+    one-hot-encoded matrix the head consumes; `norm` standardises a panel
+    tensor per channel.
+
+    Everything is fitted on `rows` and merely applied to anything else, which
+    is what keeps validation and test data out of the fit. Pass a training
+    fold during CV; pass every row for the full-data refit. Having one function
+    do both means the leakage discipline is stated once and can be checked in
+    one place.
+    """
+    num = [c for c in X.columns if c not in CATS]
+    fit_on = X.iloc[rows]
+    imp = SimpleImputer(strategy="median").fit(fit_on[num])
+    sc = StandardScaler().fit(imp.transform(fit_on[num]))
+    ohe = OneHotEncoder(handle_unknown="ignore", sparse_output=False).fit(fit_on[CATS])
+
+    chan = seq_all.shape[2]
+    mu = seq_all[rows].reshape(-1, chan).mean(0)
+    sd = seq_all[rows].reshape(-1, chan).std(0) + 1e-6
+
+    def static(df):
+        return np.hstack([sc.transform(imp.transform(df[num])),
+                          ohe.transform(df[CATS])]).astype(np.float32)
+
+    def norm(panel_tensor):
+        return ((panel_tensor - mu) / sd).astype(np.float32)
+
+    return static, norm
+
+
 def main():
     train_raw = clean(pd.read_csv("datasets/train_clean.csv", dtype={ID: str}))
     test_raw = clean(pd.read_csv("datasets/test.csv", dtype={ID: str}))
     X, y, X_test, ids = load()
 
     seq_all, seq_test = panel(train_raw), panel(test_raw)
+    # ratio features divide by bill amounts, which can be zero or negative
     num = [c for c in X.columns if c not in CATS]
     for df in (X, X_test):
         df[num] = df[num].replace([np.inf, -np.inf], np.nan)
@@ -191,20 +225,8 @@ def main():
 
     for rep in REPEATS:
         for fold, (tr, va) in enumerate(folds(X, y, seed=rep), 1):
-            # static features: impute + scale on the training fold only
-            imp = SimpleImputer(strategy="median").fit(X.iloc[tr][num])
-            sc = StandardScaler().fit(imp.transform(X.iloc[tr][num]))
-            ohe = OneHotEncoder(handle_unknown="ignore", sparse_output=False).fit(X.iloc[tr][CATS])
-
-            def static(df):
-                return np.hstack([sc.transform(imp.transform(df[num])), ohe.transform(df[CATS])]).astype(np.float32)
-
+            static, norm = preprocessors(X, seq_all, tr)      # fitted on the fold only
             st_tr, st_va, st_te = static(X.iloc[tr]), static(X.iloc[va]), static(X_test)
-
-            # sequence channels: standardize per channel on the training fold
-            mu = seq_all[tr].reshape(-1, seq_all.shape[2]).mean(0)
-            sd = seq_all[tr].reshape(-1, seq_all.shape[2]).std(0) + 1e-6
-            norm = lambda a: ((a - mu) / sd).astype(np.float32)
 
             for seed in SEEDS:
                 p_va, p_te, ep = fit_predict(
@@ -229,22 +251,12 @@ def main():
     # data, same rationale as model.py's full refit.
     n_epochs = max(1, int(np.mean(epochs_used)))
     print(f"\nfull-data refit at {n_epochs} epochs (avg best epoch across CV)", flush=True)
-    imp = SimpleImputer(strategy="median").fit(X[num])
-    sc = StandardScaler().fit(imp.transform(X[num]))
-    ohe = OneHotEncoder(handle_unknown="ignore", sparse_output=False).fit(X[CATS])
-
-    def static_all(df):
-        return np.hstack([sc.transform(imp.transform(df[num])),
-                          ohe.transform(df[CATS])]).astype(np.float32)
-
-    mu = seq_all.reshape(-1, seq_all.shape[2]).mean(0)
-    sd = seq_all.reshape(-1, seq_all.shape[2]).std(0) + 1e-6
-    nrm = lambda a: ((a - mu) / sd).astype(np.float32)
+    static, norm = preprocessors(X, seq_all, np.arange(len(X)))   # fitted on everything
 
     full_pred = np.zeros(len(X_test))
     for seed in SEEDS:
-        full_pred += fit_full(nrm(seq_all), static_all(X), y,
-                              nrm(seq_test), static_all(X_test), seed, n_epochs) / len(SEEDS)
+        full_pred += fit_full(norm(seq_all), static(X), y,
+                              norm(seq_test), static(X_test), seed, n_epochs) / len(SEEDS)
 
     test_pred = np.clip(0.5 * test_pred + 0.5 * full_pred, 1e-7, 1 - 1e-7)
     save("seq", oof, test_pred, ids)

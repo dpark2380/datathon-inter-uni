@@ -1,40 +1,46 @@
 blend OOF log loss 0.42136   base rate 0.2212   n = 24000
 
-Calibration ratio = mean predicted / actual rate.
-1.00 is perfect; above 1 over-states risk for that group, below 1 under-states it.
+calib ratio = mean predicted / actual rate. 1.00 is perfect;
+above 1 over-states risk for that group, below 1 under-states it.
+skill = group log loss / loss of predicting that group's own base rate;
+lower is better, and unlike raw log loss it is comparable across groups.
 
 === SEX ===
- group     n  actual default rate  mean predicted  calibration ratio  log loss    auc
-  male  9557               0.2396          0.2340             0.9766    0.4400 0.7910
-female 14443               0.2090          0.2070             0.9901    0.4090 0.7912
-  spread in log loss      0.0310
-  spread in calibration   0.0135   (0 = probabilities mean the same thing for every group)
+ group     n  defaults  actual rate  mean predicted  calib ratio  skill    auc
+  male  9557      2290       0.2396          0.2340       0.9766 0.7991 0.7910
+female 14443      3019       0.2090          0.2070       0.9901 0.7978 0.7912
+  spread in calibration ratio  0.0135   (0 = probabilities mean the same for every group)
+  spread in auc                0.0001
 
 === EDUCATION ===
-          group     n  actual default rate  mean predicted  calibration ratio  log loss    auc
-graduate school  8551               0.1941          0.1882             0.9695    0.3894 0.7960
-     university 11151               0.2367          0.2327             0.9834    0.4380 0.7879
-    high school  3911               0.2511          0.2495             0.9938    0.4591 0.7829
-          other   387               0.0724          0.1162             1.6066    0.2668 0.6452
-  spread in log loss      0.1923
-  spread in calibration   0.6371   (0 = probabilities mean the same thing for every group)
+          group     n  defaults  actual rate  mean predicted  calib ratio  skill    auc
+graduate school  8551      1660       0.1941          0.1882       0.9695 0.7911 0.7960
+     university 11151      2639       0.2367          0.2327       0.9834 0.8005 0.7879
+    high school  3911       982       0.2511          0.2495       0.9938 0.8147 0.7829
+          other   387        28       0.0724          0.1162       1.6066 1.0276 0.6452
+  spread in calibration ratio  0.6371   (0 = probabilities mean the same for every group)
+  spread in auc                0.1508
 
 === MARRIAGE ===
-  group     n  actual default rate  mean predicted  calibration ratio  log loss    auc
-married 11019               0.2340          0.2262             0.9669    0.4353 0.7889
- single 12685               0.2097          0.2099             1.0011    0.4079 0.7947
-  other   296               0.2399          0.2363             0.9850    0.4767 0.7545
-  spread in log loss      0.0688
-  spread in calibration   0.0342   (0 = probabilities mean the same thing for every group)
+  group     n  defaults  actual rate  mean predicted  calib ratio  skill    auc
+married 11019      2578       0.2340          0.2262       0.9669 0.8002 0.7889
+ single 12685      2660       0.2097          0.2099       1.0011 0.7943 0.7947
+  other   296        71       0.2399          0.2363       0.9850 0.8653 0.7545
+  spread in calibration ratio  0.0342   (0 = probabilities mean the same for every group)
+  spread in auc                0.0402
 
 === AGE ===
-group    n  actual default rate  mean predicted  calibration ratio  log loss    auc
- <=25 3107               0.2646          0.2560             0.9678    0.4692 0.7807
-26-30 5661               0.2017          0.2037             1.0098    0.3983 0.7949
-31-35 4608               0.1929          0.1966             1.0189    0.3976 0.7873
-36-40 3923               0.2207          0.2111             0.9564    0.4230 0.7893
-41-50 4862               0.2334          0.2232             0.9561    0.4248 0.8004
-51-60 1612               0.2450          0.2464             1.0055    0.4591 0.7682
-  60+  227               0.2643          0.2654             1.0041    0.4524 0.8100
-  spread in log loss      0.0716
-  spread in calibration   0.0628
+group    n  defaults  actual rate  mean predicted  calib ratio  skill    auc
+ <=25 3107       822       0.2646          0.2560       0.9678 0.8121 0.7807
+26-30 5661      1142       0.2017          0.2037       1.0098 0.7922 0.7949
+31-35 4608       889       0.1929          0.1966       1.0189 0.8107 0.7873
+36-40 3923       866       0.2207          0.2111       0.9564 0.8014 0.7893
+41-50 4862      1135       0.2334          0.2232       0.9561 0.7818 0.8004
+51-60 1612       395       0.2450          0.2464       1.0055 0.8245 0.7682
+  60+  227        60       0.2643          0.2654       1.0041 0.7833 0.8100
+  spread in calibration ratio  0.0628   (0 = probabilities mean the same for every group)
+  spread in auc                0.0417
+
+Small groups carry wide uncertainty: a calibration ratio built on a few
+dozen default events is directionally useful but not precise. Read the
+`defaults` column before quoting any single ratio.

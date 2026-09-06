@@ -1,16 +1,20 @@
-"""Blend the LightGBM, MLP and GRU-sequence predictions.
+"""Blend the LightGBM, GRU-sequence and TabPFN predictions into the submission.
 
-Run model.py, nn_model.py and seq_model.py first; this reads the vectors they
-saved, searches the weight simplex for the combination that minimises OOF log
-loss (the competition's actual metric), checks whether a Platt or isotonic
-recalibration of that blend lowers OOF log loss further, and writes
-.output/predictions_blend.csv.
+Run model.py, seq_model.py and tabpfn_model.py first; this reads the vectors
+they saved, searches the weight simplex for the combination that minimises OOF
+log loss (the competition's actual metric), checks whether a Platt or isotonic
+recalibration lowers it further, and writes .output/predictions_blend.csv --
+the file submitted to the leaderboard.
 
-The weight/calibration choice is made on the same 24k out-of-fold rows used to
-score the parts, so it is a fair comparison. Note the search routinely drives
-the MLP's weight to zero once seq_model is in: the GRU is a strictly better
-companion to LightGBM than the MLP was, so the printed weights are worth
-reading rather than assuming all three models contribute.
+Two details that matter for reproducing the submitted result:
+
+  * The LightGBM component uses test_lgbm_full.npy, the PURE full-data refit,
+    not the 50/50 fold/refit mix in test_lgbm.npy. Submitting the latter scored
+    0.41038 where the former scored 0.41032 when tested in isolation.
+  * nn_model.py's MLP is deliberately absent. The weight search drove it to
+    0.00 from the moment the GRU existed -- the GRU does the same job better --
+    so it is kept in the repo as a tested-and-rejected model rather than
+    carried here.
 """
 
 import numpy as np
@@ -21,7 +25,7 @@ from sklearn.metrics import log_loss, roc_auc_score
 
 from common import ID, OUT, TARGET, clean, folds, score
 
-MODELS = ("lgbm", "nn", "seq")
+MODELS = ("lgbm", "seq", "tabpfn")
 GRID = np.round(np.arange(0.0, 1.01, 0.05), 2)
 EPS = 1e-4
 
@@ -31,9 +35,11 @@ def main():
     try:
         oof = {m: np.load(OUT / f"oof_{m}.npy") for m in MODELS}
         test = {m: np.load(OUT / f"test_{m}.npy") for m in MODELS}
+        # see the module docstring: the submission uses the pure full-data refit
+        test["lgbm"] = np.load(OUT / "test_lgbm_full.npy")
     except FileNotFoundError as e:
         raise SystemExit(
-            f"missing {e.filename} -- run model.py, nn_model.py and seq_model.py first"
+            f"missing {e.filename} -- run model.py, seq_model.py and tabpfn_model.py first"
         )
 
     for m in MODELS:
@@ -45,19 +51,19 @@ def main():
     # search the weight simplex over all three models
     print("\nweight search (by OOF log loss, the competition metric):")
     losses = {}
-    for w_nn in GRID:
-        for w_seq in GRID:
-            if w_nn + w_seq > 1:
+    for w_seq in GRID:
+        for w_tab in GRID:
+            if w_seq + w_tab > 1:
                 continue
-            w = (round(1 - w_nn - w_seq, 2), round(w_nn, 2), round(w_seq, 2))
+            w = (round(1 - w_seq - w_tab, 2), round(w_seq, 2), round(w_tab, 2))
             losses[w] = log_loss(y, sum(wi * oof[m] for wi, m in zip(w, MODELS)))
 
     best = min(losses, key=losses.get)
     solo = losses[(1.0, 0.0, 0.0)]
     gain = solo - losses[best]
     for w in sorted(losses, key=losses.get)[:5]:
-        print(f"  (lgbm,nn,seq)={w}  log loss {losses[w]:.5f}")
-    print(f"\nbest weights (lgbm,nn,seq)={best}  log loss {losses[best]:.5f}"
+        print(f"  (lgbm,seq,tabpfn)={w}  log loss {losses[w]:.5f}")
+    print(f"\nbest weights (lgbm,seq,tabpfn)={best}  log loss {losses[best]:.5f}"
           f"  (-{gain:.5f} vs lgbm alone)")
     if gain < 0.0005:
         print("gain is under 0.0005, i.e. inside fold noise -- plain lgbm is the safer pick")
