@@ -20,7 +20,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import log_loss, roc_auc_score
+from sklearn.metrics import log_loss
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from common import (AMT, BILL, CATS, ID, PAY, REPEATS, TARGET, clean, folds,
