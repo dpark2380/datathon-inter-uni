@@ -17,8 +17,8 @@ Blend weights 0.5 / 0.3 / 0.2 over LightGBM, GRU and TabPFN:
 
 ```python
 import numpy as np, pandas as pd
-lgbm = np.load(".output/test_lgbm_full.npy")   # pure full-data refit
-seq  = np.load(".output/test_seq.npy")
+lgbm = np.load("artifacts/test_lgbm_full.npy")   # pure full-data refit, NOT test_lgbm.npy
+seq  = np.load("artifacts/test_seq.npy")
 tab  = np.load("artifacts/tabpfn_3rep/test_tabpfn_3rep.npy")
 preds = np.clip(0.5*lgbm + 0.3*seq + 0.2*tab, 1e-4, 1-1e-4)
 ids = pd.read_csv("datasets/test.csv", usecols=["client_id"], dtype={"client_id": str})["client_id"]

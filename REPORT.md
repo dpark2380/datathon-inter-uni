@@ -394,7 +394,7 @@ state is required — the pipeline is plain scripts.
 | `models/survival_model.py` | Discrete-time hazard reformulation (weight 0.00 in the final blend) |
 | `models/pseudo_label.py` | Pseudo-labelling the test set — a recorded negative result |
 | `models/interpret.py` | SHAP attributions and the reliability diagram → `output/analysis/` |
-| `main.py` | The earliest RandomForest baseline (0.43615). Superseded and **not** part of the final pipeline; retained only as the starting point of the progression in §1.7 |
+| `models/main.py` | The earliest RandomForest baseline (0.43615). Superseded and **not** part of the final pipeline; retained only as the starting point of the progression in §1.7 |
 
 Every stage the PDF asks about is covered: data loading (`common.load`),
 preprocessing (`common.clean`, `Data Cleaning.ipynb`), feature generation
@@ -423,7 +423,7 @@ max |reconstructed − submitted| = 9.7e-17    (submissions/submission_tabpfn3.c
 ```
 
 The second-best submission, `submissions/submission_tabpfn3.csv` (0.40995), reconstructs
-exactly the same way from `artifacts/tabpfn_3rep/`. The other eleven
+exactly the same way from `artifacts/tabpfn_3rep/`. The other twelve
 `submission_*.csv` files in the repository are the earlier steps of the
 progression in §1.7 and are retained as the experimental record.
 
@@ -465,7 +465,7 @@ artifacts/tabpfn_3rep/…                     The 3-repeat configuration → sub
 Python 3.14.5, with `numpy` 2.5.2, `pandas` 3.0.5, `scikit-learn` 1.9.0,
 `lightgbm` 4.7.0, `torch` 2.14.0, `scipy` 1.18.1, `shap` 0.52.0 (analysis only),
 and `tabpfn` 8.5.0. Versions are pinned in `uv.lock`; `tabpfn` is supplied at run
-time via `uv run --with tabpfn` and is **not** in the lock file.
+time via `uv run --with tabpfn`. It has since been added to `pyproject.toml` and `uv.lock`, so `uv sync` now installs it and the `--with` flag is no longer required.
 
 ### Important seeds and settings
 
@@ -509,7 +509,7 @@ pd.DataFrame({"client_id": ids, "prob_default": preds}) \
 ```bash
 uv run python models/model.py                                                # ~10 min → .output/test_lgbm_full.npy
 uv run python models/seq_model.py                                            # ~50 min → .output/test_seq.npy
-TABPFN_TOKEN="<token>" uv run --with tabpfn python models/tabpfn_model.py    # ~3h 10m → .output/test_tabpfn.npy
+TABPFN_TOKEN="<token>" uv run python models/tabpfn_model.py    # ~3h 10m → .output/test_tabpfn.npy
 uv run python models/blend.py                                                # weight search + submission
 ```
 
@@ -646,7 +646,7 @@ other than the pretrained TabPFN weights disclosed above.
 | Leaderboard score for the submitted file | 0.40982 for `submissions/submission_tabpfn6.csv` (§3); full progression in §1.7 |
 | Experiment / model comparison results | `docs/experiment-ledger.html` — all 41 experiments with measured deltas |
 | Saved model files | `artifacts/` — prediction vectors rather than model binaries, which is what makes the expensive TabPFN run reproducible in seconds (§4) |
-| Environment file | `uv.lock` (`pyproject.toml` for the top-level set); `tabpfn` supplied via `uv run --with tabpfn` |
+| Environment file | `requirements.txt`, `uv.lock`, and `pyproject.toml` for the top-level set; `tabpfn` is now a declared dependency |
 
 ## Reproducibility Summary
 
