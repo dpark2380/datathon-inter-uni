@@ -91,6 +91,32 @@ class Net(nn.Module):
         return self.head(torch.cat([h, static], dim=1)).squeeze(1)
 
 
+def _make_model(n_static, make_model=None):
+    factory = make_model or Net
+    return factory(n_static).to(DEV)
+
+
+def _tensor(array):
+    return torch.tensor(array, device=DEV)
+
+
+def _train_epoch(model, optimizer, loss_function, seq, static, target):
+    model.train()
+    permutation = torch.randperm(len(seq), device=DEV)
+    for start in range(0, len(seq), BATCH):
+        rows = permutation[start : start + BATCH]
+        optimizer.zero_grad()
+        loss = loss_function(model(seq[rows], static[rows]), target[rows])
+        loss.backward()
+        optimizer.step()
+
+
+def _predict(model, seq, static):
+    model.eval()
+    with torch.no_grad():
+        return torch.sigmoid(model(seq, static)).cpu().numpy()
+
+
 def fit_predict(seq_tr, st_tr, y_tr, seq_va, st_va, y_va, seq_te, st_te, seed,
                 make_model=None):
     """Train one net with early stopping on validation log loss.
@@ -100,31 +126,20 @@ def fit_predict(seq_tr, st_tr, y_tr, seq_va, st_va, y_va, seq_te, st_te, seed,
     code.
     """
     torch.manual_seed(seed)
-    make_model = make_model or (lambda n: Net(n))
-    model = make_model(st_tr.shape[1]).to(DEV)
-    opt = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
-    lossf = nn.BCEWithLogitsLoss()
+    model = _make_model(st_tr.shape[1], make_model)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
+    loss_function = nn.BCEWithLogitsLoss()
 
-    t = lambda a: torch.tensor(a, device=DEV)
-    seq_tr_t, st_tr_t, y_tr_t = t(seq_tr), t(st_tr), t(y_tr.astype(np.float32))
-    seq_va_t, st_va_t = t(seq_va), t(st_va)
-    seq_te_t, st_te_t = t(seq_te), t(st_te)
+    seq_tr_t = _tensor(seq_tr)
+    st_tr_t = _tensor(st_tr)
+    y_tr_t = _tensor(y_tr.astype(np.float32))
+    seq_va_t, st_va_t = _tensor(seq_va), _tensor(st_va)
+    seq_te_t, st_te_t = _tensor(seq_te), _tensor(st_te)
 
     best, best_state, bad = np.inf, None, 0
-    n = len(seq_tr)
     for epoch in range(MAX_EPOCHS):
-        model.train()
-        perm = torch.randperm(n, device=DEV)
-        for i in range(0, n, BATCH):
-            idx = perm[i : i + BATCH]
-            opt.zero_grad()
-            loss = lossf(model(seq_tr_t[idx], st_tr_t[idx]), y_tr_t[idx])
-            loss.backward()
-            opt.step()
-
-        model.eval()
-        with torch.no_grad():
-            p_va = torch.sigmoid(model(seq_va_t, st_va_t)).cpu().numpy()
+        _train_epoch(model, optimizer, loss_function, seq_tr_t, st_tr_t, y_tr_t)
+        p_va = _predict(model, seq_va_t, st_va_t)
         ll = log_loss(y_va, np.clip(p_va, 1e-7, 1 - 1e-7))
         if ll < best - 1e-5:
             best, bad = ll, 0
@@ -135,10 +150,8 @@ def fit_predict(seq_tr, st_tr, y_tr, seq_va, st_va, y_va, seq_te, st_te, seed,
                 break
 
     model.load_state_dict(best_state)
-    model.eval()
-    with torch.no_grad():
-        p_va = torch.sigmoid(model(seq_va_t, st_va_t)).cpu().numpy()
-        p_te = torch.sigmoid(model(seq_te_t, st_te_t)).cpu().numpy()
+    p_va = _predict(model, seq_va_t, st_va_t)
+    p_te = _predict(model, seq_te_t, st_te_t)
     return p_va, p_te, epoch - bad + 1
 
 
@@ -151,26 +164,17 @@ def fit_full(seq_tr, st_tr, y_tr, seq_te, st_te, seed, epochs, make_model=None):
     and the two get averaged for the test predictions.
     """
     torch.manual_seed(1000 + seed)
-    make_model = make_model or (lambda n: Net(n))
-    model = make_model(st_tr.shape[1]).to(DEV)
-    opt = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
-    lossf = nn.BCEWithLogitsLoss()
+    model = _make_model(st_tr.shape[1], make_model)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
+    loss_function = nn.BCEWithLogitsLoss()
 
-    t = lambda a: torch.tensor(a, device=DEV)
-    seq_tr_t, st_tr_t, y_tr_t = t(seq_tr), t(st_tr), t(y_tr.astype(np.float32))
-    n = len(seq_tr)
+    seq_tr_t = _tensor(seq_tr)
+    st_tr_t = _tensor(st_tr)
+    y_tr_t = _tensor(y_tr.astype(np.float32))
     for _ in range(epochs):
-        model.train()
-        perm = torch.randperm(n, device=DEV)
-        for i in range(0, n, BATCH):
-            idx = perm[i : i + BATCH]
-            opt.zero_grad()
-            lossf(model(seq_tr_t[idx], st_tr_t[idx]), y_tr_t[idx]).backward()
-            opt.step()
+        _train_epoch(model, optimizer, loss_function, seq_tr_t, st_tr_t, y_tr_t)
 
-    model.eval()
-    with torch.no_grad():
-        return torch.sigmoid(model(t(seq_te), t(st_te))).cpu().numpy()
+    return _predict(model, _tensor(seq_te), _tensor(st_te))
 
 
 def preprocessors(X, seq_all, rows):
@@ -179,7 +183,7 @@ def preprocessors(X, seq_all, rows):
     Returns (static, norm): `static` scales + one-hot-encodes a feature frame
     for the head; `norm` standardises a panel tensor per channel. Fitting
     only on `rows` (a training fold during CV, or every row for the full
-    refit) is what keeps validation/test data out of the fit -- one function
+    refit) is what keeps validation/test data out of the fit. One function
     for both cases means that leakage discipline lives in a single place.
     """
     num = [c for c in X.columns if c not in CATS]
@@ -242,8 +246,8 @@ def main():
 
     # Refit on all 24k rows at the average best epoch, then average with the
     # fold ensemble. OOF can't measure this gain (it only sees 80%-data fold
-    # models) but test predictions do, from a model trained on 25% more data
-    # -- same rationale as lgbm_model.py's full refit.
+    # models) but test predictions do, from a model trained on 25% more data,
+    # same rationale as lgbm_model.py's full refit.
     n_epochs = max(1, int(np.mean(epochs_used)))
     print(f"\nfull-data refit at {n_epochs} epochs (avg best epoch across CV)", flush=True)
     static, norm = preprocessors(X, seq_all, np.arange(len(X)))   # fitted on everything
