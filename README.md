@@ -148,3 +148,32 @@ weights. See `models/rejected/README.md` for the table, and
   pipeline where selection — and so overfitting risk — genuinely occurs. The
   weight surface is flat and shrinking toward uniform made the score worse, both
   of which suggest the fit is stable.
+
+### End-to-End Pipeline Architecture                                                                
+                                                                                                      
+    [ datasets/train_clean.csv & test.csv ]                                                           
+                       │                                                                              
+                       ▼  Step 1: Data Cleaning (models/common.py:L29-36)                             
+             [ Collapsed Categories ]                                                                 
+                       │                                                                              
+             ┌─────────┴──────────────────────────────────────────┐                                   
+             ▼                                                    ▼                                   
+    Step 2A: 81 Tabular Features                      Step 2B: 6x8 Temporal Panel                     
+    (models/common.py:L39-142)                         (models/seq_model.py:L40-68)                   
+             │                                                    │                                   
+             ├──────────────────────────┐                         │                                   
+             ▼                          ▼                         ▼                                   
+       Step 3: LightGBM           Step 5: TabPFN            Step 4: Bi-GRU                            
+      (models/model.py)      (models/tabpfn_model.py)    (models/seq_model.py)                        
+       90 trees + refit          30 fits + refit           150 nets + refit                           
+             │                          │                         │                                   
+             └──────────────────────────┼─────────────────────────┘                                   
+                                        │                                                             
+                                        ▼  Step 6: Blending & Calibration (models/blend.py)           
+                          [ 45% LGBM + 30% GRU + 25% TabPFN ]                                         
+                                        │                                                             
+                                        ▼  Step 7: Bounded Clipping [1e-4, 1-1e-4]                    
+                          [ submissions/submission_tabpfn6.csv ] (0.40982)                            
+                                        │                                                             
+                                        ▼  Step 8: Governance, SHAP & Fairness                        
+                          (models/interpret.py & models/fairness_audit.py)  
