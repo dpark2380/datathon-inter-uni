@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Credit Default Prediction — Submission Documents</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
+<style>
+  :root{
+    --ground:#F6F7F9; --panel:#FFFFFF; --panel-2:#ECEFF3;
+    --ink:#14181F; --ink-2:#3C4652; --ink-3:#6A7686;
+    --rule:#D2DAE2; --rule-soft:#E5EAEF;
+    --lgbm:#1F6F5C; --gru:#7A4E9C; --tab:#B26A16; --warn:#9E4A34;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+    --serif:"IBM Plex Serif",Georgia,serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ground:#0C1016; --panel:#141A22; --panel-2:#1A222B;
+      --ink:#E7EDF4; --ink-2:#B3BFCC; --ink-3:#8492A2;
+      --rule:#28313C; --rule-soft:#1F2731;
+      --lgbm:#54C4A6; --gru:#B58BD6; --tab:#E0A254; --warn:#D98A70;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0C1016; --panel:#141A22; --panel-2:#1A222B;
+    --ink:#E7EDF4; --ink-2:#B3BFCC; --ink-3:#8492A2;
+    --rule:#28313C; --rule-soft:#1F2731;
+    --lgbm:#54C4A6; --gru:#B58BD6; --tab:#E0A254; --warn:#D98A70;
+  }
+  *{box-sizing:border-box;}
+  body{background:var(--ground);color:var(--ink);font-family:var(--serif);
+    font-size:16px;line-height:1.62;margin:0;padding:0 20px 90px;}
+  .wrap{max-width:1120px;margin:0 auto;}
+  .measure{max-width:67ch;}
+  h1,h2,h3,.eyebrow,.stat b{font-family:var(--sans);}
+  h1{font-size:clamp(29px,4.2vw,44px);line-height:1.08;letter-spacing:-.022em;
+    font-weight:700;margin:0 0 14px;text-wrap:balance;}
+  h2{font-size:19px;font-weight:600;letter-spacing:-.012em;margin:0;}
+  p{margin:0 0 14px;}
+  a{color:var(--lgbm);}
+  .eyebrow{font-size:11px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--ink-3);margin:0 0 10px;}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+  code{font-family:var(--mono);font-size:.88em;background:var(--panel-2);
+    padding:1px 5px;border-radius:3px;}
+  header.top{border-bottom:2px solid var(--ink);padding:50px 0 26px;margin-bottom:34px;}
+  .sub{color:var(--ink-2);font-size:17px;margin:0;}
+
+  .figures{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    border:1px solid var(--rule);background:var(--panel);margin-top:24px;}
+  .stat{padding:15px 17px;border-right:1px solid var(--rule);}
+  .stat:last-child{border-right:none;}
+  .stat span{display:block;font-family:var(--sans);font-size:10.5px;font-weight:600;
+    letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px;}
+  .stat b{display:block;font-family:var(--mono);font-size:24px;font-weight:600;
+    letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums;}
+  .stat i{display:block;font-style:normal;font-size:12px;color:var(--ink-3);
+    margin-top:5px;font-family:var(--sans);}
+
+  .docs{display:grid;gap:14px;margin-top:26px;}
+  .doc{display:block;border:1px solid var(--rule);border-left-width:3px;
+    background:var(--panel);padding:16px 18px 17px;text-decoration:none;color:inherit;}
+  .doc:hover{background:var(--panel-2);}
+  .doc.m{border-left-color:var(--lgbm);}
+  .doc.l{border-left-color:var(--gru);}
+  .doc h2{color:var(--lgbm);}
+  .doc.l h2{color:var(--gru);}
+  .doc p{margin:6px 0 0;font-size:14.5px;color:var(--ink-2);}
+  .doc .file{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);
+    margin-top:9px;display:block;}
+
+  .note{border-left:2px solid var(--warn);padding:2px 0 2px 18px;margin:30px 0 0;
+    color:var(--ink-2);font-size:14.5px;}
+  .note strong{font-family:var(--sans);color:var(--ink);}
+  footer{margin-top:50px;padding-top:18px;border-top:1px solid var(--rule);
+    font-family:var(--sans);font-size:12.5px;color:var(--ink-3);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">Credit default prediction &middot; submission documents</p>
+  <h1>How the model works, and everything we tried to get there</h1>
+  <p class="sub measure">Two standalone documents accompanying the final submission: what the model is and why, and the full record of the forty-one experiments behind it.</p>
+  <div class="figures">
+    <div class="stat"><span>Hidden test</span><b>0.40982</b><i>binary log loss</i></div>
+    <div class="stat"><span>Blend</span><b>0.45 / 0.30 / 0.25</b><i>LightGBM / GRU / TabPFN</i></div>
+    <div class="stat"><span>Experiments</span><b>41</b><i>4 helped, 37 did not</i></div>
+  </div>
+</header>
+
+<div class="docs">
+  <a class="doc m" href="methodology-report.html">
+    <h2>Methodology report</h2>
+    <p>What the final model is, how each of the three components makes a prediction, how the blend weights were chosen, and where it is weak.</p>
+    <span class="file">methodology-report.html</span>
+  </a>
+  <a class="doc l" href="experiment-ledger.html">
+    <h2>Experiment ledger</h2>
+    <p>All 41 experiments with measured deltas against the 0.0005 noise threshold, and why each one did or did not work.</p>
+    <span class="file">experiment-ledger.html</span>
+  </a>
+</div>
+
+<div class="note measure">
+  <strong>Final result.</strong> Hidden-test log loss <span class="mono">0.40982</span>, from a plain weighted average of probabilities &mdash; 0.45 LightGBM + 0.30 GRU + 0.25 TabPFN &mdash; with no calibration or post-processing beyond clipping to [1e-4, 1&minus;1e-4]. Disclosures (pretrained model, AI coding agent, external solutions consulted) are in the <a href="https://github.com/dpark2380/datathon-inter-uni/blob/main/docs/README.md">docs README</a>.
+</div>
+
+<footer>
+  <p>Source: <a href="https://github.com/dpark2380/datathon-inter-uni">github.com/dpark2380/datathon-inter-uni</a></p>
+</footer>
+
+</div>
+</body>
+</html>
