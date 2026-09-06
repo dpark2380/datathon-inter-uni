@@ -185,17 +185,17 @@
   <p class="measure"><strong>Why keep the trees so short?</strong> Four questions deep means a tree can combine at most four facts about someone. That sounds limiting, but with only 24,000 customers a deeper tree starts carving out branches describing a handful of specific individuals rather than a real pattern. We tested 135 configurations; every deeper or less-constrained one scored worse.</p>
 
   <figure class="plate">
-    <img src="assets/figures/shap_summary.png" alt="SHAP summary plot: each feature's contribution to the LightGBM prediction across all customers, ranked by mean absolute impact." loading="lazy">
-    <figcaption><b>What the whole model relies on.</b> SHAP attributions across all customers, ranked by average impact. The single tree above is one draw; this is the aggregate, and it puts recent repayment status at the top for the same reason every one of the 30 models opened on it.</figcaption>
+    <img src="assets/figures/shap_summary.png" alt="SHAP summary plot ranking features by mean absolute impact on the LightGBM prediction. The top three are months_since_late, PAY_0 and recent_late." loading="lazy">
+    <figcaption><b>What the whole model relies on.</b> SHAP attributions across all customers, ranked by average impact. The single tree above is one draw; this is the aggregate &mdash; and the top three features are <code>months_since_late</code>, <code>PAY_0</code> and <code>recent_late</code>, which is the same &ldquo;four ways of asking one question&rdquo; that the 30 models opened on. Two spending-decomposition features reach the top fifteen.</figcaption>
   </figure>
 
   <figure class="plate">
-    <img src="assets/figures/shap_waterfall_highest_risk.png" alt="SHAP waterfall for the customer the model scored as highest risk: recent_late, PAY_0 and pay_max push the prediction up to 0.862." loading="lazy">
-    <figcaption><b>The customer the model is most sure about.</b> Every feature&rsquo;s push away from the 22.1% base rate, for one individual decision &mdash; the same accounting the trace above performs tree by tree, collapsed onto the features responsible.</figcaption>
+    <img src="assets/figures/shap_waterfall_highest_risk.png" alt="SHAP waterfall for the customer scored as highest risk: PAY_0, recent_late and months_since_late push the prediction up to 0.849." loading="lazy">
+    <figcaption><b>The customer the model is most sure about.</b> Every feature&rsquo;s push away from the model&rsquo;s baseline output, ending at 0.849 &mdash; the same accounting the trace above performs tree by tree, collapsed onto the features responsible.</figcaption>
   </figure>
   <figure class="plate">
-    <img src="assets/figures/shap_waterfall_lowest_risk.png" alt="SHAP waterfall for the customer the model scored as lowest risk: high payments and available credit push the prediction down to 0.021." loading="lazy">
-    <figcaption><b>And the one it is most sure about in the other direction.</b> Any single decision can be explained this way, which is what makes the 45%-weight component auditable per customer.</figcaption>
+    <img src="assets/figures/shap_waterfall_lowest_risk.png" alt="SHAP waterfall for the customer scored as lowest risk: large payments, high available credit and six clean months push the prediction down to 0.022." loading="lazy">
+    <figcaption><b>And the one it is most sure about in the other direction.</b> The same accounting downward, ending at 0.022. Any single decision can be explained this way, which is what makes the 45%-weight component auditable per customer.</figcaption>
   </figure>
 
   <h3 style="margin-top:44px;">3.2 &nbsp;GRU: forming an impression while reading the file month by month</h3>
