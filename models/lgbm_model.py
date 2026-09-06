@@ -12,8 +12,8 @@ from sklearn.metrics import roc_auc_score
 from common import OUT, REPEATS, folds, load, save, score
 
 # Picked by a 5-fold sweep over depth/leaves/regularization. Shallow and
-# heavily regularized wins: the signal here is mostly the PAY_* history and
-# deeper trees just overfit it (deeper: 0.7843 auc, this: 0.7891).
+# heavily regularized wins (0.7891 auc vs 0.7843 for deeper trees) -- the
+# signal here is mostly PAY_* history, and deeper trees just overfit it.
 PARAMS = dict(
     objective="binary",
     learning_rate=0.03,
@@ -73,14 +73,15 @@ def main():
         full_pred += full.predict_proba(X_test)[:, 1] / len(SEEDS)
     preds = 0.5 * test_pred + 0.5 * full_pred
 
-    # Keep the two components separately so the mixing ratio can be probed
-    # without retraining. The 50/50 above was inherited, never tested; the
-    # refit mechanism itself is confirmed (it gained 0.00023 on the board).
+    # Saved separately so the 50/50 mix above can be re-tuned without
+    # retraining. That split is inherited and untested; only the refit
+    # mechanism itself is confirmed to help (+0.00023 on the leaderboard).
     np.save(OUT / "test_lgbm_folds.npy", test_pred)
     np.save(OUT / "test_lgbm_full.npy", full_pred)
 
     save("lgbm", oof, preds, ids)
     print(f"base rate {y.mean():.4f}  mean predicted {preds.mean():.4f}")
+
     imp = pd.Series(full.feature_importances_, index=X.columns).nlargest(15)
     print("\ntop features\n" + imp.to_string())
 
