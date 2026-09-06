@@ -173,7 +173,7 @@
     <div class="stat"><span>Hidden test</span><b>0.40982</b><i>binary log loss</i></div>
     <div class="stat"><span>Cross-validated</span><b>0.42136</b><i>out-of-fold, 24k rows</i></div>
     <div class="stat"><span>Components</span><b>3</b><i>of 10 model families tried</i></div>
-    <div class="stat"><span>Models averaged</span><b>273</b><i>fits behind one prediction</i></div>
+    <div class="stat"><span>Models averaged</span><b>281</b><i>270 CV fits + 11 full-data refits</i></div>
   </div>
 </header>
 
@@ -401,7 +401,7 @@
 <section>
   <p class="eyebrow">Provenance</p>
   <h2>How we arrived here</h2>
-  <p class="lede measure">Seven submissions, each building on the last. The two large gains came from different sources &mdash; one from information, one from a representation.</p>
+  <p class="lede measure">Eight submissions, each building on the last. The two large gains came from different sources &mdash; one from information, one from a representation.</p>
   <div class="twrap">
     <table>
       <thead><tr><th>Step</th><th>Change</th><th>Score</th><th>Gain</th></tr></thead>
@@ -428,13 +428,13 @@
       <h3>Advantages</h3>
       <div class="item"><h4>Three genuinely different inductive biases</h4><p>Aggregate statistics, temporal sequence, and a pretrained prior. Diversity is structural rather than cosmetic &mdash; models that merely differed in algorithm (CatBoost, ExtraTrees, logistic regression) all received weight zero.</p></div>
       <div class="item"><h4>Calibrated without post-processing</h4><p>Probabilities can be read as probabilities. Four independent calibration tests each concluded no adjustment was warranted, which matters for a lender setting its own risk thresholds.</p></div>
-      <div class="item"><h4>Low variance by construction</h4><p>255 model fits across six fold partitions stand behind each prediction. Averaging involves no parameter selection, so it cannot overfit &mdash; it is the one component of the design with a mathematical guarantee.</p></div>
-      <div class="item"><h4>Interpretable where it counts</h4><p>The 50%-weight component is a tree model with SHAP attributions available per customer, so any individual decision can be explained by feature contribution.</p></div>
+      <div class="item"><h4>Low variance by construction</h4><p>270 cross-validated fits across six fold partitions, plus 11 full-data refits, stand behind each prediction. Averaging involves no parameter selection, so it cannot overfit &mdash; it is the one component of the design with a mathematical guarantee.</p></div>
+      <div class="item"><h4>Interpretable where it counts</h4><p>The 45%-weight component is a tree model with SHAP attributions available per customer, so any individual decision can be explained by feature contribution.</p></div>
       <div class="item"><h4>No fragile tricks</h4><p>No pseudo-labelling, no rank transforms, no leaderboard-fitted post-processing. Every step was validated out-of-fold before being adopted.</p></div>
     </div>
     <div class="col">
       <h3>Disadvantages</h3>
-      <div class="item"><h4>Most of the value sits in one model</h4><p>LightGBM alone reaches 0.42211 out-of-fold; all three together reach 0.42138. The other two components add roughly 0.0007 for 165 extra model fits and two additional dependencies. The ensemble is <em>expensive</em> relative to its marginal gain.</p></div>
+      <div class="item"><h4>Most of the value sits in one model</h4><p>LightGBM alone reaches 0.42211 out-of-fold; all three together reach 0.42136. The other two components add roughly 0.0007 for 180 extra model fits and two additional dependencies. The ensemble is <em>expensive</em> relative to its marginal gain.</p></div>
       <div class="item"><h4>TabPFN is a reproducibility liability</h4><p>It needs a Prior Labs licence, an API token and a weights download, and takes ~50 minutes to run. Anyone reproducing this must clear those gates &mdash; a real cost for 0.2 of the blend.</p></div>
       <div class="item"><h4>Blend weights are fitted to validation data</h4><p>Unlike the averaging, weight selection is a genuine selection step and carries overfitting risk. Mitigated but not eliminated: the surface is flat, and shrinking toward uniform made the score worse, both of which suggest the fit is stable.</p></div>
       <div class="item"><h4>Compute cost is substantial</h4><p>A full retrain is several hours, dominated by 150 GRU fits and TabPFN's context-length scaling. Iteration is slow, which limited how many ideas could be tested near the deadline.</p></div>

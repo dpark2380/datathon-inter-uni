@@ -233,9 +233,9 @@
   <p class="sub measure">Forty-one experiments against a binary log&nbsp;loss target, scored on 24,000 labelled customers and a 6,000-row hidden test set. One feature family and one architecture produced nearly all of the gain; everything else is recorded here because knowing what does <em>not</em> work on this data is most of the result.</p>
 
   <div class="figures">
-    <div class="stat"><span>Best score</span><b>0.41032</b><i>hidden test log loss</i></div>
+    <div class="stat"><span>Best score</span><b>0.40982</b><i>hidden test log loss</i></div>
     <div class="stat"><span>Opening score</span><b>0.41260</b><i>first submission</i></div>
-    <div class="stat"><span>Gap to first place</span><b>0.00051</b><i>leader at 0.40981</i></div>
+    <div class="stat"><span>Gap to first place</span><b>0.00015</b><i>leader at 0.40967</i></div>
     <div class="stat"><span>Experiments</span><b>41</b><i>4 helped, 37 did not</i></div>
   </div>
 </header>
@@ -300,7 +300,7 @@
       <div class="idx">06</div>
       <div class="what">
         <strong>Survival / hazard model in the blend</strong>
-        <em>Window-rolling augmentation earned a third of the blend weight and 0.00027 on OOF &mdash; the first model in seven families to earn any weight at all. The leaderboard disagreed.</em>
+        <em>Window-rolling augmentation earned a third of the blend weight and 0.00027 on OOF &mdash; the first model in seven challenger families to earn any weight at all. The leaderboard disagreed.</em>
       </div>
       <div class="score">0.41044</div>
       <div class="delta down">+0.00006</div>
@@ -314,6 +314,26 @@
       </div>
       <div class="score">0.41032</div>
       <div class="delta up">&minus;0.00006</div>
+    </div>
+
+    <div class="step">
+      <div class="idx">08</div>
+      <div class="what">
+        <strong>TabPFN added to the blend</strong>
+        <em>A transformer pretrained on synthetic tabular tasks, run over the same 81 features. A third inductive bias &mdash; a learned prior rather than a fitted model &mdash; and the first challenger family to hold weight on the leaderboard as well as OOF.</em>
+      </div>
+      <div class="score">0.40995</div>
+      <div class="delta up">&minus;0.00037</div>
+    </div>
+
+    <div class="step">
+      <div class="idx">09</div>
+      <div class="what">
+        <strong>TabPFN raised to six partitions + full-data refit</strong>
+        <em>The same treatment already given to the other two components: six fold partitions instead of three, plus a refit on all 24k rows. Final submission.</em>
+      </div>
+      <div class="score">0.40982</div>
+      <div class="delta up">&minus;0.00013</div>
     </div>
   </div>
 </section>
@@ -379,7 +399,7 @@
           <td class="why">Payment-sequence tokens and demographic cells, nested inside folds to avoid leakage. 1,028 distinct sequence tokens over 24,000 rows &mdash; roughly 23 rows each, too sparse to estimate reliably.</td>
         </tr>
 
-        <tr class="grp"><td colspan="4">Model families &mdash; 7 tried, 0 earned lasting blend weight</td></tr>
+        <tr class="grp"><td colspan="4">Model families &mdash; 10 tried, 3 kept, 7 challengers rejected</td></tr>
         <tr>
           <td>GRU sequence model</td>
           <td class="n up">+0.00042</td>
@@ -608,18 +628,18 @@
   <div class="findings">
     <div class="finding">
       <h3>New information wins; new algorithms do not</h3>
-      <p>Seven model families were tried and none held blend weight. Six feature families were tried and one worked &mdash; the one that recovered a quantity the dataset never stated. The distinction that predicts success is not sophistication but whether something enters the model that wasn't already expressible from the existing columns. Feeding the winning feature family to the winning architecture in a richer form changed nothing once the information itself was already present &mdash; it was never the representation doing the work.</p>
-      <span class="ev">7 architectures &rarr; 0 kept &nbsp;&middot;&nbsp; 1 accounting identity &rarr; the largest gain of the project &nbsp;&middot;&nbsp; re-presenting that same information in sequence form &rarr; +0.00002</span>
+      <p>Ten model families were tried and three held blend weight &mdash; all three fixed early; the seven challenger families that followed held none. Seven feature families were tried and one worked &mdash; the one that recovered a quantity the dataset never stated. The distinction that predicts success is not sophistication but whether something enters the model that wasn't already expressible from the existing columns. Feeding the winning feature family to the winning architecture in a richer form changed nothing once the information itself was already present &mdash; it was never the representation doing the work.</p>
+      <span class="ev">7 challenger architectures &rarr; 0 kept &nbsp;&middot;&nbsp; 1 accounting identity &rarr; the largest gain of the project &nbsp;&middot;&nbsp; re-presenting that same information in sequence form &rarr; +0.00002</span>
     </div>
     <div class="finding">
       <h3>Cross-validation understates feature gains and overstates everything else</h3>
-      <p>The spending features improved OOF by 0.00048 and the hidden test set by 0.00173 &mdash; a 3.6&times; amplification. The sixth repeated-CV partition improved OOF by 0.00024 and the test set by nothing at all. Small OOF gains from averaging did not translate; gains from better features translated at more than triple their measured size.</p>
-      <span class="ev">features 3.6&times; amplified &nbsp;&middot;&nbsp; averaging tweaks 0&times;</span>
+      <p>The spending features improved OOF by 0.00046 and the hidden test set by 0.00173 &mdash; a 3.8&times; amplification. The sixth repeated-CV partition improved OOF by 0.00024 and the test set by nothing at all. Small OOF gains from averaging did not translate; gains from better features translated at more than triple their measured size.</p>
+      <span class="ev">features 3.8&times; amplified &nbsp;&middot;&nbsp; averaging tweaks 0&times;</span>
     </div>
     <div class="finding">
       <h3>Decorrelation is necessary but nowhere near sufficient</h3>
-      <p>The intuition that an ensemble wants uncorrelated members is only half true. Logistic regression was the most decorrelated model produced all session, at 0.948 against LightGBM, and the optimal blend still assigned it exactly zero weight. The GRU earned 35% at a <em>higher</em> correlation of 0.979. What matters is whether the disagreement is informative.</p>
-      <span class="ev">logreg 0.948 corr &rarr; weight 0.00 &nbsp;&middot;&nbsp; GRU 0.979 corr &rarr; weight 0.35</span>
+      <p>The intuition that an ensemble wants uncorrelated members is only half true. Logistic regression was the most decorrelated model produced all session, at 0.948 against LightGBM, and the optimal blend still assigned it exactly zero weight. The GRU earned 30% at a <em>higher</em> correlation of 0.9825. What matters is whether the disagreement is informative.</p>
+      <span class="ev">logreg 0.948 corr &rarr; weight 0.00 &nbsp;&middot;&nbsp; GRU 0.9825 corr &rarr; weight 0.30</span>
     </div>
     <div class="finding">
       <h3>The hardest cases carry no signal at all</h3>
@@ -639,6 +659,6 @@
 </section>
 
 <footer>
-  <p>Final model: 0.65 &times; LightGBM over 81 engineered features + 0.35 &times; bidirectional GRU over the six-month payment panel. Both trained across six fold partitions with full-data refits; probabilities used uncalibrated, verified against a reliability diagram. Out-of-fold log&nbsp;loss 0.42155, hidden test 0.41032.</p>
+  <p>Final model: 0.45 &times; LightGBM over 81 engineered features + 0.30 &times; bidirectional GRU over the six-month payment panel + 0.25 &times; TabPFN, combined as a plain weighted average. 270 cross-validated fold fits plus 11 full-data refits; probabilities used uncalibrated, verified against a reliability diagram. Out-of-fold log&nbsp;loss 0.42136, hidden test 0.40982.</p>
 </footer>
 </div>
