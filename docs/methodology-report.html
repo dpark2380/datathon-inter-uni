@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Methodology report — Credit Default Prediction</title>
-<meta name="description" content="What the final three-model ensemble is, how each component makes a prediction, how the blend weights were chosen, and where it is weak.">
+<meta name="description" content="Approach, cleaning, feature engineering, validation, model selection, ensembling and results for a three-model ensemble scoring 0.40982 log loss.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&display=swap">
@@ -25,13 +25,14 @@
 
   <p class="grp">Methodology report</p>
   <ol>
-    <li><a class="item" href="#pipeline"><span class="no">1</span>Pipeline</a></li>
-    <li><a class="item" href="#components"><span class="no">2</span>The three components</a></li>
-    <li><a class="item" href="#mechanics"><span class="no">3</span>How a prediction is computed</a></li>
-    <li><a class="item" href="#blend"><span class="no">4</span>Combining the three</a></li>
-    <li><a class="item" href="#provenance"><span class="no">5</span>How we arrived here</a></li>
-    <li><a class="item" href="#assessment"><span class="no">6</span>Strengths and weaknesses</a></li>
-    <li><a class="item" href="#next"><span class="no">7</span>What we would try next</a></li>
+    <li><a class="item" href="#approach"><span class="no">1</span>Approach</a></li>
+    <li><a class="item" href="#cleaning"><span class="no">2</span>Data cleaning</a></li>
+    <li><a class="item" href="#features"><span class="no">3</span>Feature engineering</a></li>
+    <li><a class="item" href="#validation"><span class="no">4</span>Validation strategy</a></li>
+    <li><a class="item" href="#models"><span class="no">5</span>Models tested &amp; selection</a></li>
+    <li><a class="item" href="#ensembling"><span class="no">6</span>Ensembling &amp; post-processing</a></li>
+    <li><a class="item" href="#results"><span class="no">7</span>Results &amp; limitations</a></li>
+    <li><a class="item" href="#appendix"><span class="no">A</span>How a prediction is computed</a></li>
   </ol>
 
   <p class="grp">Experiment ledger</p>
@@ -75,9 +76,15 @@
   </div>
 </header>
 
-<section id="pipeline">
-  <div class="sechead"><span class="no">1</span><h2>Pipeline</h2></div>
-  <p class="lede measure">Every customer passes through the same five stages. The only branch is at modelling, where three learners see the same rows through different lenses.</p>
+<!-- ===================== 1. APPROACH ===================== -->
+<section id="approach">
+  <div class="sechead"><span class="no">1</span><h2>Approach</h2></div>
+  <p class="lede measure">The task is to predict the probability that a customer defaults on their next payment, scored on binary log loss over 6,000 hidden customers. Because that metric rewards well-calibrated probabilities rather than correct labels, every decision was judged on log loss directly &mdash; never on accuracy, and never on AUC.</p>
+
+  <p class="measure">Two consequences followed from the metric and shaped everything below. We never rebalanced the classes, because the 22.121% positive rate is the rate the test set is drawn from and log loss rewards predicting it honestly. And we optimised the loss the metric actually uses at every stage: the GRU trains on binary cross-entropy, LightGBM on binary log loss, and the blend weights are chosen on log loss rather than on any proxy.</p>
+
+  <p class="measure">Every customer then passes through the same five stages. The only branch is at modelling, where three learners see the same rows through different lenses.</p>
+
   <div class="pipe">
     <div class="pstep"><span class="n">stage 1</span><strong>Clean</strong><em>Undocumented category codes collapsed: <code>EDUCATION</code> 0/5/6 &rarr; 4, <code>MARRIAGE</code> 0 &rarr; 3.</em></div>
     <div class="pstep"><span class="n">stage 2</span><strong>Engineer</strong><em>23 raw columns &rarr; 81 features: lateness history, utilisation, payment coverage, spending decomposition.</em></div>
@@ -85,18 +92,150 @@
     <div class="pstep"><span class="n">stage 4</span><strong>Blend</strong><em>Fixed weighted average of probabilities, weights chosen by out-of-fold log loss.</em></div>
     <div class="pstep"><span class="n">stage 5</span><strong>Emit</strong><em>Clip to [1e-4, 1&minus;1e-4] and write <code>client_id, prob_default</code>. No other post-processing.</em></div>
   </div>
+
+  <p class="note measure"><strong>Where the split sits.</strong> The train/test division is fixed by the competition, and no step before modelling ever consults a label. Cleaning and feature engineering are pure row-wise functions applied identically to both sets, so they can safely run before the fold split. Everything that <em>is</em> fitted &mdash; the neural network&rsquo;s scalers, blend weights, every calibrator we tested &mdash; is fitted on training folds only and scored on rows it never saw.</p>
 </section>
 
-<section id="components">
-  <div class="sechead"><span class="no">2</span><h2>The three components, and what each one sees</h2></div>
-  <p class="lede measure">The blend works because these disagree for reasons rather than at random. Each is given the same customers and derives a different kind of evidence from them.</p>
+<!-- ===================== 2. CLEANING ===================== -->
+<section id="cleaning">
+  <div class="sechead"><span class="no">2</span><h2>Data cleaning and preprocessing</h2></div>
+  <p class="lede measure">Cleaning is deliberately minimal. The dataset has no missing values and no malformed rows; the only real defect is undocumented category codes. Each of the three changes below collapses codes that carry the same meaning.</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <thead>
+      <tr><th scope="col">Column</th><th scope="col">Change</th><th scope="col">Reason</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>MARRIAGE</code></td>
+        <td>code <span class="mono">0</span> &rarr; <span class="mono">3</span></td>
+        <td>The dictionary defines 1&ndash;3 only. An unknown marital status is not distinguishable from &ldquo;other&rdquo; for prediction purposes.</td>
+      </tr>
+      <tr>
+        <td><code>EDUCATION</code></td>
+        <td>codes <span class="mono">0</span>, <span class="mono">5</span>, <span class="mono">6</span> &rarr; <span class="mono">4</span></td>
+        <td>The dictionary defines 1&ndash;4 only; 4 is already &ldquo;other&rdquo;. The three undocumented codes cover a small tail and behave like it.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="note measure"><strong>Where the repayment codes are handled.</strong> <code>PAY_0</code>&hellip;<code>PAY_6</code> carry three codes that all mean &ldquo;not behind this month&rdquo;: &minus;2 (no balance), &minus;1 (paid in full) and 0 (paid the minimum). We deliberately do <em>not</em> collapse them here. The raw columns are left intact, and the collapsing happens inside feature engineering instead &mdash; the lateness family is computed on <code>PAY.clip(lower=0)</code>, which folds &minus;2 and &minus;1 into 0, while <code>ever_paid_full</code> and <code>never_used</code> read the original &minus;1 and &minus;2 codes. Collapsing at the cleaning stage would have destroyed those two features; doing it per-family keeps both readings available.</p>
+
+  <p class="measure" style="margin-top:20px;">Implemented in <code>common.clean()</code> and applied identically to train and test. <code>2_Data_Cleaning.ipynb</code> performs the same substitutions and writes <code>datasets/train_clean.csv</code>.</p>
+
+  <h3 style="margin-top:30px;">Deliberately not done</h3>
+  <p class="measure">Four common preprocessing steps were considered and rejected, each for a stated reason. Under log loss these are not neutral defaults &mdash; three of them would actively hurt.</p>
+  <ul class="deflist measure">
+    <li><b>No outlier removal</b>Large bills and payments are genuine, and log loss punishes mis-scoring them. The heavy-tailed amount columns are handled with <code>log1p</code> transforms inside feature engineering instead.</li>
+    <li><b>No resampling or class weighting</b>The 22.121% positive rate is the rate the test set is drawn from. Rebalancing shifts predicted probabilities off the true base rate, which is precisely what log loss penalises. This is also why TabPFN runs with <code>balance_probabilities=False</code>.</li>
+    <li><b>No imputation of the <code>PAY_*</code> sentinels</b>&minus;1 and &minus;2 are informative states, not missing data. They are collapsed above because they share a meaning, and separately preserved as the flags <code>ever_paid_full</code> and <code>never_used</code>.</li>
+    <li><b>No scaling for the tree model</b>LightGBM is invariant to monotone transforms, so scaling it would change nothing. Scaling is applied only inside <code>models/seq_model.py</code>, and fitted on training folds only.</li>
+  </ul>
+
+  <p class="measure" style="margin-top:20px;"><code>SEX</code>, <code>EDUCATION</code> and <code>MARRIAGE</code> are kept as pandas <code>category</code> dtype so LightGBM handles them natively; the neural models one-hot encode them, and TabPFN receives them as integer codes with their column indices declared through <code>categorical_features_indices</code>.</p>
+</section>
+
+<!-- ===================== 3. FEATURES ===================== -->
+<section id="features">
+  <div class="sechead"><span class="no">3</span><h2>Feature engineering</h2></div>
+  <p class="lede measure">23 raw columns become <strong>81 features</strong> in six families (<code>common.features()</code>). The design principle throughout is to convert absolute amounts into ratios that are comparable across customers with very different credit limits &mdash; and then, in one family, to deliberately put the scale back.</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <thead>
+      <tr><th scope="col">Family</th><th scope="col">Examples</th><th scope="col">What it captures</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Repayment history</td>
+        <td><code>pay_max</code>, <code>pay_mean</code>, <code>n_late</code>, <code>n_late2plus</code>, <code>trend_pay</code>, <code>recent_late</code>, <code>max_late_streak</code>, <code>months_since_late</code>, <code>ever_paid_full</code>, <code>never_used</code></td>
+        <td>How often, how badly and how <em>recently</em> the customer fell behind. <code>recent_late</code> weights lateness by how long ago it happened.</td>
+      </tr>
+      <tr>
+        <td>Credit utilisation</td>
+        <td><code>util1</code>&hellip;<code>util6</code>, <code>util_mean</code>, <code>util_max</code>, <code>util_trend</code>, <code>avail_credit</code></td>
+        <td>Balance as a fraction of the limit, and its direction. Consistently high utilisation suggests a customer short of funds.</td>
+      </tr>
+      <tr>
+        <td>Payment coverage</td>
+        <td><code>payratio1</code>&hellip;<code>payratio5</code>, <code>payratio_mean</code>, <code>payratio_min</code>, <code>paid_full_months</code>, <code>n_zero_pay</code></td>
+        <td>What fraction of each month&rsquo;s bill was actually paid the following month.</td>
+      </tr>
+      <tr>
+        <td>Levels and momentum</td>
+        <td><code>bill_sum/mean/std</code>, <code>amt_sum/mean/std</code>, <code>coverage_total</code>, <code>bill_growth</code>, <code>amt_over_limit</code>, <code>log_limit</code></td>
+        <td>Absolute scale, log-compressed &mdash; the one family that puts back what the ratios strip out.</td>
+      </tr>
+      <tr class="hl">
+        <td><strong>Spending decomposition</strong></td>
+        <td><code>spend1</code>&hellip;<code>spend5</code>, <code>spend_mean/max/std/trend/total</code>, <code>n_months_no_spend</code>, <code>spend_minus_paid</code>, <code>months_spend_gt_paid</code></td>
+        <td><strong>New information</strong> the dataset never states &mdash; see below.</td>
+      </tr>
+      <tr>
+        <td>Minimum-payment behaviour</td>
+        <td><code>min_pay_ratio_mean</code>, <code>min_pay_ratio_min</code>, <code>months_paid_about_min</code>, <code>months_paid_under_min</code></td>
+        <td>Whether the customer services only the minimum due (10% assumed) &mdash; a sign of strain, especially at high balances.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout measure">
+    <p><strong>The spending decomposition &mdash; the largest single gain of the project.</strong> The dataset gives statement balances and payments made, but never the amount <em>charged</em> in a month. That quantity is recoverable exactly, from the identity that governs a revolving account:</p>
+    <p class="mono" style="margin:12px 0;">BILL_t = BILL_(t+1) &minus; PAY_AMT_t + spend_t &nbsp;&nbsp;&rArr;&nbsp;&nbsp; spend_t = BILL_t &minus; BILL_(t+1) + PAY_AMT_t</p>
+    <p>This matters because a rising balance is ambiguous without it. A balance rising because the customer is <em>spending more</em> is a different risk story from one rising because they <em>stopped paying</em>, and no combination of the pre-existing features could separate those two cases. Measured worth: <strong>+0.00046 out-of-fold and &minus;0.00173 on the hidden test set</strong> &mdash; the largest move of the project.</p>
+  </div>
+
+  <h3 style="margin-top:30px;">Why one family deliberately restores scale</h3>
+  <p class="measure">Every family except &ldquo;levels and momentum&rdquo; is a ratio or a count, which strips scale out on purpose &mdash; <code>payratio3</code> is the same number whether the customer owes $500 or $50,000. That is usually what we want, but it discards something real: the absolute size of the debt, and whether it is growing.</p>
+  <p class="measure">Those features were added alongside the neural models, and the reason is a genuine difference between the two model types. A decision tree is <strong>scale-invariant</strong>: it splits on thresholds, so multiplying a feature by 1,000 or taking its logarithm changes nothing about which splits it finds. A neural network is not &mdash; it multiplies inputs by weights and sums them, so a feature measured in tens of thousands swamps one measured in fractions unless the inputs are standardised and the magnitudes are expressed in a usable form. These features give the network the scale information the ratio features removed.</p>
+
+  <h3 style="margin-top:30px;">The sequence view</h3>
+  <p class="measure">For the GRU the same six months are additionally reshaped into a <strong>6 timesteps &times; 8 channels</strong> panel, oldest month first: repayment status, a lateness flag, bill as a fraction of the limit, payment as a fraction of the limit, log-scaled bill and payment, the change in balance since the previous month, and the fraction of the previous bill the payment covered.</p>
+
+  <figure class="plate">
+    <img src="assets/figures/shap_summary.png" alt="SHAP summary plot ranking features by mean absolute impact on the LightGBM prediction. The top three are months_since_late, PAY_0 and recent_late." loading="lazy">
+    <figcaption><b>What the model actually relies on.</b> SHAP attributions across all customers, ranked by average impact. The top three are <code>months_since_late</code>, <code>PAY_0</code> and <code>recent_late</code> &mdash; three ways of asking one question: how recently did this customer fall behind. Two spending-decomposition features reach the top fifteen.</figcaption>
+  </figure>
+
+  <h3 style="margin-top:30px;">Six families that did not survive</h3>
+  <p class="measure">Behavioural payment signatures (+0.00006), spending re-supplied as an ordered GRU channel (+0.00002), interaction terms (0.00000), peer-relative credit limit (&minus;0.00011), velocity and acceleration derivatives (&minus;0.00024) and target encoding (&minus;0.00052) were all tested and none reached the noise floor.</p>
+  <p class="note measure"><strong>The pattern is the point.</strong> The family that worked introduced a quantity the dataset never stated. The six that failed recombined or re-summarised information already present. This is the single most consistent finding of the whole experiment record, and it is why we stopped adding features rather than adding more.</p>
+</section>
+
+<!-- ===================== 4. VALIDATION ===================== -->
+<section id="validation">
+  <div class="sechead"><span class="no">4</span><h2>Validation strategy</h2></div>
+  <p class="lede measure">Stratified 5-fold cross-validation, repeated over <strong>6 different fold partitions</strong> (<code>common.folds</code>, <code>StratifiedKFold(5, shuffle=True, random_state=seed)</code> with seeds 0&ndash;5). Every model calls the same function with the same seeds, so all out-of-fold vectors are row-aligned and directly comparable.</p>
+
+  <p class="measure">Three properties of this design carried most of the weight &mdash; more than the choice of split itself.</p>
+
+  <ul class="deflist measure">
+    <li><b>A shared noise floor</b>Repeating experiments on identical splits established that a difference below <strong>0.0005</strong> in out-of-fold log loss is not distinguishable from fold noise on 24,000 rows. Every result in the ledger is reported against that threshold, and no change below it was adopted on its point estimate alone.</li>
+    <li><b>Strictly out-of-fold scoring of anything fitted</b>Blend weights, calibrators and target-derived features are all scored on rows the fitting never saw. This was not the original protocol &mdash; see the isotonic finding below.</li>
+    <li><b>A known, quantified blind spot</b>Repeated CV and the full-data refit are both invisible to out-of-fold scoring <em>by construction</em>: each OOF row is predicted only by its own fold&rsquo;s models, while every test row is predicted by the average of all of them, and OOF never involves a model refitted on 100% of the data. Confirmed on the leaderboard &mdash; the full-data refit is worth 0.00023 on the hidden test set and exactly zero on OOF.</li>
+  </ul>
+
+  <p class="measure">The relationship between the two held steady throughout (OOF &asymp; 0.4214 against hidden test &asymp; 0.4098), so OOF decided <em>whether</em> to adopt a change and the leaderboard only confirmed it.</p>
+
+  <div class="callout measure">
+    <p><strong>The mistake that set the protocol.</strong> Isotonic calibration initially looked like a large win &mdash; 0.42107 against a 0.42136 baseline. It was being fitted on the same out-of-fold predictions it was then scored against, and a flexible monotonic function will happily absorb the noise in the rows judging it. Re-run under proper nested cross-validation it scored 0.42919, the single worst result in our table. Every fitted combiner after that point was scored strictly out-of-fold. We record it because the corrected number, not the original one, is what the rest of this report is built on.</p>
+  </div>
+</section>
+
+<!-- ===================== 5. MODELS ===================== -->
+<section id="models">
+  <div class="sechead"><span class="no">5</span><h2>Models tested and final model selection</h2></div>
+  <p class="lede measure"><strong>Ten model families were tried. Three earned blend weight.</strong> The blend works because these three disagree for reasons rather than at random &mdash; each is given the same customers and derives a different <em>kind</em> of evidence from them.</p>
 
   <div class="comps">
     <div class="comp c-l">
       <h3>LightGBM</h3>
       <p class="wt">the aggregate view &middot; weight 0.45 &middot; OOF 0.42211 &middot; AUC 0.79104</p>
-      <p>Gradient-boosted decision trees. Each tree looks at where the trees before it were wrong and fits those leftover errors; hundreds of shallow trees accumulate into one prediction. It reads the 81 engineered features as a flat description of the customer &mdash; how often late, how much of the limit used, how well bills were covered.</p>
-      <p>It is deliberately small. Depth 4 with 12 leaves and heavy L2 regularisation beat every deeper configuration across 135 tested: the signal here is concentrated in recent repayment status, and larger trees memorise noise around it.</p>
+      <p>Gradient-boosted decision trees. Each tree looks at where the trees before it were wrong and fits those leftover errors; hundreds of shallow trees accumulate into one prediction. It reads the 81 engineered features as a flat description of the customer.</p>
+      <p>It is deliberately small. Depth 4 with 12 leaves and heavy L2 regularisation beat every deeper configuration across 135 tested: the signal is concentrated in recent repayment status, and larger trees memorise noise around it.</p>
       <dl>
         <dt>Depth / leaves</dt><dd>4 / 12</dd>
         <dt>Learning rate</dt><dd>0.03</dd>
@@ -111,7 +250,7 @@
       <h3>GRU</h3>
       <p class="wt">the trajectory view &middot; weight 0.30 &middot; OOF 0.42392 &middot; AUC 0.78942</p>
       <p>A recurrent network that walks the six months in order, oldest to newest, carrying a memory it updates at each step. Learned gates decide what to retain and what to discard, so it can weigh a recent lapse more heavily than an old one.</p>
-      <p>It exists because the aggregates are lossy in one specific way. Two customers each late twice &mdash; one recovering, one deteriorating &mdash; share an identical <code>n_late</code>, <code>pay_max</code> and <code>pay_mean</code>. The flat features literally cannot separate them; reading the months in sequence can. Adding it displaced an earlier MLP entirely, dropping that model&rsquo;s weight to zero.</p>
+      <p>It exists because the aggregates are lossy in one specific way. Two customers each late twice &mdash; one recovering, one deteriorating &mdash; share an identical <code>n_late</code>, <code>pay_max</code> and <code>pay_mean</code>. The flat features literally cannot separate them; reading the months in sequence can.</p>
       <dl>
         <dt>Architecture</dt><dd>2-layer bi-GRU</dd>
         <dt>Hidden state</dt><dd>32</dd>
@@ -125,8 +264,8 @@
     <div class="comp c-t">
       <h3>TabPFN</h3>
       <p class="wt">the borrowed prior &middot; weight 0.25 &middot; OOF 0.42345 &middot; AUC 0.79091</p>
-      <p>A transformer pretrained by Prior Labs on millions of synthetic tabular datasets. It fits no parameters to our data at all: the training rows are supplied as context and it predicts by pattern-matching against a prior learned during pretraining &mdash; in-context learning, the mechanism behind large language models, applied to tables.</p>
-      <p>That makes it different in kind rather than in architecture, which is why it earned weight where seven other families did not. It matched our tuned GRU with zero tuning of its own. It is also the component with the heaviest external dependency: pretrained weights, a licence and an API token.</p>
+      <p>A transformer pretrained by Prior Labs on millions of synthetic tabular datasets. It fits no parameters to our data at all: the training rows are supplied as context and it predicts by pattern-matching against a prior learned during pretraining &mdash; in-context learning applied to tables.</p>
+      <p>That makes it different in kind rather than in architecture, which is why it earned weight where seven other families did not. It matched our tuned GRU with zero tuning of its own.</p>
       <dl>
         <dt>Type</dt><dd>pretrained, external</dd>
         <dt>Fitting on our data</dt><dd>none</dd>
@@ -137,20 +276,172 @@
       </dl>
     </div>
   </div>
+
+  <p class="measure" style="margin-top:34px;"><a href="#appendix">Appendix A</a> traces one real customer through all three, step by step, if you want the mechanism rather than the summary.</p>
+
+  <h3 style="margin-top:30px;">The seven that were rejected</h3>
+  <p class="measure">All received weight 0.00 in the final weight search &mdash; not by judgement, but by the same grid search that set the weights of the three above.</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <thead>
+      <tr><th scope="col">Model</th><th scope="col" class="n">OOF log loss</th><th scope="col">Why it failed</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Survival / hazard</td><td class="n">0.42260</td><td>Best of the rejects; briefly took a third of the blend on OOF (+0.00027), but the gain did not survive on the hidden test set (0.41044 against 0.41038).</td></tr>
+      <tr><td>Sequence + spend channel</td><td class="n">0.42426</td><td>Spending re-supplied as an ordered channel rather than as statics; +0.00002 against a matched control.</td></tr>
+      <tr><td>1D-CNN</td><td class="n">0.42601</td><td>Correlated 0.9924 with the GRU &mdash; different architecture, identical signal. It split the sequence weight rather than adding to it.</td></tr>
+      <tr><td>Autoencoder</td><td class="n">0.42685</td><td>Reconstruction loss was a straight cost against classification.</td></tr>
+      <tr><td>MLP</td><td class="n">0.42882</td><td>Displaced entirely once the GRU was added.</td></tr>
+      <tr><td>CatBoost, ExtraTrees, logistic regression, multi-task GRU</td><td class="n flat">&mdash;</td><td>All weight 0.00; full numbers in the <a href="experiment-ledger.html#ledger">experiment ledger</a>.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3 style="margin-top:30px;">Hyperparameter tuning</h3>
+  <p class="measure"><strong>135 LightGBM configurations</strong> were tested across three sweeps: 40 coarse, 60 fine, and one scored by blend contribution rather than solo performance. The incumbent &mdash; originally tuned against AUC &mdash; was never beaten; the best challenger was 0.00004 better, twelve times below the noise floor. The GRU was the one model never previously tuned, and its architecture sweep produced a real gain (smaller hidden state, two layers, heavier dropout, faster learning rate), though it shipped in the same submission as the spending features and so is not independently isolated.</p>
+
+  <div class="callout measure">
+    <p><strong>Why decorrelation was not the selection criterion.</strong> The intuition that an ensemble wants uncorrelated members is only half right, and this dataset produced an unusually clean counter-example. Logistic regression was the most decorrelated model in the entire project &mdash; 0.948 against LightGBM &mdash; and the weight search still gave it exactly <strong>0.00</strong>. The GRU earned 0.30 at a <em>higher</em> correlation of 0.983. What matters is not that a model disagrees, but that its disagreements are informative. Correlations among the three kept models: GRU&ndash;LightGBM 0.983, TabPFN&ndash;LightGBM 0.990, TabPFN&ndash;GRU 0.985.</p>
+  </div>
 </section>
 
-<section id="mechanics">
-  <div class="sechead"><span class="no">3</span><h2>How one prediction is actually computed</h2></div>
-  <p class="lede measure">Take one real customer &mdash; late last month, late the month before, and carrying a balance close to their limit &mdash; and follow what each model does to turn that into a number between 0 and 1. Assumed here: you know what training data and features are. Everything past that is explained.</p>
+<!-- ===================== 6. ENSEMBLING ===================== -->
+<section id="ensembling">
+  <div class="sechead"><span class="no">6</span><h2>Ensembling and post-processing</h2></div>
+  <p class="lede measure">A plain weighted average of the three probabilities &mdash; no meta-model, no per-customer switching. Both of those were tested and were among the worst results recorded; a feature-aware meta-model came in 0.00208 <em>worse</em> than simple averaging.</p>
 
-  <h3 style="margin-top:34px;">3.1 &nbsp;LightGBM: hundreds of small yes/no checklists, added together</h3>
+  <h3 style="margin-top:30px;">How the weights were chosen</h3>
+  <p class="measure">Grid search here means exactly what it sounds like: try every combination and keep the best. Nothing is being fitted &mdash; three numbers are being <em>looked up</em>.</p>
+  <ul class="deflist measure">
+    <li><b>Collect three prediction vectors</b>Each model produced a probability for all 24,000 training customers &mdash; crucially, out-of-fold, where every customer was scored by a model that never saw their label. Those numbers are honest stand-ins for unseen data.</li>
+    <li><b>Enumerate the possibilities</b>Step each weight in increments of 0.05, keeping only combinations summing to 1: about 230 valid triples.</li>
+    <li><b>Score each one</b>For a candidate like (0.5, 0.3, 0.2), compute the blended probability for all 24,000 customers and measure log loss against the true outcomes. One number per candidate.</li>
+    <li><b>Keep the lowest</b>(0.45, 0.30, 0.25) scored 0.42136, the best of the 230.</li>
+  </ul>
+
+  <div class="tbl-wrap">
+  <table class="data" style="min-width:480px;">
+    <caption>Selected candidates from the 230, with distance from the best score.</caption>
+    <thead>
+      <tr><th scope="col">Weights (LGBM / GRU / TabPFN)</th><th scope="col" class="n">OOF log loss</th><th scope="col">Distance from best</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>(1.00, 0.00, 0.00) &nbsp;<span class="flat">lgbm only</span></td><td class="n">0.42211</td><td><span class="pbar" style="width:200px"></span></td></tr>
+      <tr><td>(0.65, 0.35, 0.00) &nbsp;<span class="flat">no tabpfn</span></td><td class="n">0.42155</td><td><span class="pbar" style="width:51px"></span></td></tr>
+      <tr><td>(0.55, 0.30, 0.15)</td><td class="n">0.42141</td><td><span class="pbar" style="width:13px"></span></td></tr>
+      <tr class="hl"><td>(0.45, 0.30, 0.25) &nbsp;selected</td><td class="n">0.42136</td><td><span class="pbar sel" style="width:2px"></span></td></tr>
+      <tr><td>(0.34, 0.33, 0.33) &nbsp;<span class="flat">equal weights</span></td><td class="n">0.42147</td><td><span class="pbar" style="width:29px"></span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="measure" style="margin-top:20px;"><strong>The flatness is the reassuring part.</strong> Every weighting from 0.50 to 0.70 on LightGBM lands within 0.0001, so the optimum is a broad plateau rather than a sharp peak. A sharp peak would suggest the weights had latched onto noise in these particular 24,000 rows; a plateau means almost any sensible weighting performs the same. We tested that directly: shrinking the weights halfway toward equal &mdash; the standard remedy for weights overfitted to validation data &mdash; made the hidden-test score <em>worse</em> (0.41045 against 0.41032, measured at the two-model stage). This is the one step in the pipeline where genuine selection happens, so it is where overfitting risk lives; the flat surface and the failed shrinkage test are the evidence that the risk did not materialise.</p>
+
+  <p class="measure">For a customer where LightGBM says 30%, the GRU says 20% and TabPFN says 25%, the submitted probability is <code>0.45&times;0.30 + 0.30&times;0.20 + 0.25&times;0.25 = 26%</code>. The averaging is mathematically safe for this metric: log loss is convex, so by Jensen&rsquo;s inequality the loss of an averaged prediction never exceeds the average of the individual losses.</p>
+
+  <h3 style="margin-top:30px;">Post-processing: one clip, and nothing else</h3>
+  <p class="measure"><strong>No calibration is applied</strong>, and that is a finding rather than an omission. Platt scaling, isotonic regression, per-segment calibration and base-rate shrinkage were each tested under nested cross-validation; all made log loss worse, and the shrinkage search independently selected &alpha; = 1.0, meaning &ldquo;do not adjust&rdquo;. The only post-processing is clipping the final probabilities to <code>[1e-4, 1&minus;1e-4]</code>, insurance against a single confidently-wrong prediction contributing an enormous penalty.</p>
+
+  <figure class="plate" style="max-width:520px;">
+    <img src="assets/figures/reliability_diagram.png" alt="Reliability diagram: mean predicted probability against observed default rate per decile bin, sitting on the diagonal." loading="lazy">
+    <figcaption><b>Why every correction we fitted made things worse.</b> Predicted probability against observed default rate, per decile. Both components track the diagonal across the whole range &mdash; which is what &ldquo;the probabilities can be read as probabilities&rdquo; means in practice.</figcaption>
+  </figure>
+</section>
+
+<!-- ===================== 7. RESULTS ===================== -->
+<section id="results">
+  <div class="sechead"><span class="no">7</span><h2>Key results, observations and limitations</h2></div>
+  <p class="lede measure">Final score: <strong>0.40982</strong> on the hidden test set, against 0.42136 out-of-fold. Eight submissions, each building on the last; forty-one logged experiments, of which four produced a gain that survived.</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <thead>
+      <tr><th scope="col">Step</th><th scope="col">Change</th><th scope="col" class="n">Score</th><th scope="col" class="n">Gain</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="n">1</td><td>Log-loss alignment + GRU added to LightGBM</td><td class="n">0.41260</td><td class="n flat">baseline</td></tr>
+      <tr><td class="n">2</td><td>Full-data refit for the GRU</td><td class="n">0.41237</td><td class="n up">&minus;0.00023</td></tr>
+      <tr><td class="n">3</td><td>Repeated cross-validation, 3 partitions</td><td class="n">0.41211</td><td class="n up">&minus;0.00026</td></tr>
+      <tr><td class="n">4</td><td>Repeated cross-validation, 6 partitions</td><td class="n">0.41211</td><td class="n flat">0.00000</td></tr>
+      <tr class="hl"><td class="n">5</td><td>Spending decomposition features + tuned GRU</td><td class="n">0.41038</td><td class="n up">&minus;0.00173</td></tr>
+      <tr><td class="n">6</td><td>Pure full-data refit for LightGBM</td><td class="n">0.41032</td><td class="n up">&minus;0.00006</td></tr>
+      <tr><td class="n">7</td><td>TabPFN added to the blend</td><td class="n">0.40995</td><td class="n up">&minus;0.00037</td></tr>
+      <tr><td class="n">8</td><td>TabPFN raised to 6 partitions + full-data refit</td><td class="n">0.40982</td><td class="n up">&minus;0.00013</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="measure" style="margin-top:18px;">The full sequence &mdash; including the submission that regressed, and every experiment that never reached a submission &mdash; is in the <a href="experiment-ledger.html#survived">experiment ledger</a>.</p>
+
+  <h3 style="margin-top:34px;">Three observations that generalise</h3>
+  <ul class="deflist measure">
+    <li><b>New information wins; new algorithms do not</b>Seven model families were rejected outright, while one accounting identity produced our largest gain. Every gain we recorded came either from deriving a quantity the data did not state, or from averaging more of the same models &mdash; never from a more sophisticated algorithm.</li>
+    <li><b>Cross-validation understated the feature gain and overstated the averaging gain</b>The spending features measured +0.00046 on OOF and delivered &minus;0.00173 on the hidden test &mdash; 3.6&times; larger. Repeated CV measured a gain on OOF and delivered nothing. The direction of the error is systematic, not random: OOF cannot see anything that changes how many models vote on a test row.</li>
+    <li><b>Decorrelation is necessary but not sufficient</b>Our most decorrelated model earned weight 0.00; the GRU earned 0.30 at a higher correlation. Disagreement only helps when it is informative.</li>
+  </ul>
+
+  <div class="two">
+    <div>
+      <h3>Strengths</h3>
+      <ul class="deflist">
+        <li><b>Three genuinely different inductive biases</b>Aggregate statistics, temporal sequence, and a pretrained prior. Diversity is structural rather than cosmetic &mdash; models that merely differed in algorithm all received weight zero.</li>
+        <li><b>Calibrated without post-processing</b>Probabilities can be read as probabilities. Four independent calibration tests each concluded no adjustment was warranted, which matters for a lender setting its own risk thresholds.</li>
+        <li><b>Low variance by construction</b>270 cross-validated fits across six fold partitions, plus 11 full-data refits, stand behind each prediction. Averaging involves no parameter selection, so it cannot overfit &mdash; the one component of the design with a mathematical guarantee.</li>
+        <li><b>Interpretable where it counts</b>The 45%-weight component is a tree model with SHAP attributions available per customer, so any individual decision can be explained by feature contribution.</li>
+        <li><b>No fragile tricks</b>No pseudo-labelling, no rank transforms, no leaderboard-fitted post-processing. Every step was validated out-of-fold before adoption.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Limitations</h3>
+      <ul class="deflist">
+        <li><b>Part of the target is unreachable from this data</b>The twenty worst-predicted customers are all defaulters the model rated at 2&ndash;4% risk, every one with a spotless payment record. Whatever drove those defaults is absent from the columns we were given.</li>
+        <li><b>One subgroup is served noticeably worse</b>Our fairness audit found <code>EDUCATION="other"</code> (387 customers, 28 defaults) is over-predicted by 61% relative and ranked poorly (AUC 0.645 against ~0.79 elsewhere). That category is where our own cleaning collapses undocumented codes 0, 5 and 6, so it is a heterogeneous catch-all &mdash; and the only group where the model does worse than simply predicting that group&rsquo;s base rate.</li>
+        <li><b>Most of the value sits in one model</b>LightGBM alone reaches 0.42211 out-of-fold; all three together reach 0.42136. The other two components buy roughly 0.0007 for 180 extra fits and two additional dependencies.</li>
+        <li><b>Blend weights are fitted to validation data</b>Unlike the averaging, weight selection is genuine selection and carries overfitting risk. Mitigated but not eliminated, as described in &sect;6.</li>
+        <li><b>TabPFN is a reproducibility liability</b>It needs a Prior Labs licence, an API token and a weights download, and takes ~50 minutes to run &mdash; a real cost for 0.25 of the blend.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="margin-top:34px;">What we would try next, and why we stopped</h3>
+  <p class="measure">Work stopped at the deadline, not at the point where ideas ran out. These are the specific things left on the table, recorded so the stopping point is a documented decision rather than an unexplained gap.</p>
+  <div class="next">
+    <div class="item">
+      <h3>1 &nbsp;TabPFN internal ensembling</h3>
+      <p>TabPFN ran with <code>n_estimators=4</code> &mdash; the number of times it re-reads the data under different feature orderings before averaging. Raising it to 8 or 16 improves <em>the quality of each fit</em>, which is different from the repeated cross-validation we already exhausted (that averages more fits of the same quality). It is the only genuinely untested knob left on the winning configuration.</p>
+      <p class="why"><b>Why not done:</b> the run at <code>n_estimators=4</code> took 3h 10m, and under 4 hours remained before the deadline with no way to submit a partial result.</p>
+      <p class="why"><b>An avoidable cost:</b> TabPFN was run on CPU. It was set that way on the first pilot to sidestep a possible incompatibility with Apple&rsquo;s Metal backend, and never revisited. Tested afterwards, <code>device="mps"</code> works correctly and is faster even on a small subset (4.8s against 6.8s on 3,000 rows, identical predictions to float precision). The full run would plausibly have taken about an hour rather than three &mdash; which would have made this experiment affordable. The constraint was a wrong assumption, not the hardware.</p>
+    </div>
+    <div class="item">
+      <h3>2 &nbsp;A GRU trained on more channels</h3>
+      <p>The sequence model reads 8 channels per month. The spending features that produced our largest gain reach it only as flattened static inputs, never as an ordered per-month trajectory. We tested exactly this and measured +0.00002 &mdash; but at 3 partitions rather than 6, and with the spending features already present as statics in both arms, so the test isolated only whether <em>ordering</em> helps. A cleaner design would compare against a GRU with no spending information at all.</p>
+      <p class="why"><b>Why not done:</b> the measured effect was inside noise, and the cleaner experiment needs two full GRU runs at roughly 50 minutes each.</p>
+    </div>
+    <div class="item">
+      <h3>3 &nbsp;More TabPFN fold partitions</h3>
+      <p>TabPFN carries 25% of the blend on 30 fold-fits, against LightGBM&rsquo;s 90 and the GRU&rsquo;s 150. It remains the least-averaged component, so it sits earliest on the variance-reduction curve where each doubling buys proportionally more.</p>
+      <p class="why"><b>Why not done:</b> going 3&rarr;6 partitions moved out-of-fold log loss by 0.00002. The leaderboard gained 0.00013, but that came mostly from the full-data refit added in the same run &mdash; which now exists and cannot be added twice.</p>
+    </div>
+  </div>
+
+  <div class="callout measure">
+    <p><strong>The honest position at the deadline.</strong> None of the remaining ideas is worth more than roughly 0.0001 on the evidence available, and each costs hours. That is not a claim the model cannot be improved &mdash; the leader demonstrably has more &mdash; but the levers we can still name are exhausted, and the ones we would reach for next are already measured as saturating. A better result would most likely require a genuinely new insight about the data rather than more of what is described here.</p>
+  </div>
+</section>
+
+<!-- ===================== APPENDIX ===================== -->
+<section id="appendix">
+  <div class="sechead"><span class="no">A</span><h2>Appendix: how one prediction is actually computed</h2></div>
+  <p class="lede measure">Everything above is the method. This is the mechanism &mdash; one real customer, late last month and the month before, carrying a balance close to their limit, followed through each of the three models. Skippable; nothing in sections 1&ndash;7 depends on it.</p>
+
+  <h3 style="margin-top:34px;">A.1 &nbsp;LightGBM: hundreds of small yes/no checklists, added together</h3>
   <p class="measure">A decision tree is a flowchart of yes/no questions ending in a verdict. This model builds hundreds of them, each deliberately short &mdash; four questions deep at most.</p>
 
   <h4>Where the questions come from</h4>
-  <p class="measure">Nobody writes them. At each point in the tree the algorithm tries every feature at every sensible threshold &mdash; is <code>PAY_0</code> above 0, above 1, above 2; is <code>util_mean</code> above 0.3, 0.4, 0.5 &mdash; and measures how much separating the customers that way would reduce its error. That measure is called the <em>gain</em>. It keeps the single best split, then repeats the search on each side. Our settings stop it at four questions deep, twelve leaves, and no leaf smaller than 100 customers.</p>
+  <p class="measure">Nobody writes them. At each point in the tree the algorithm tries every feature at every sensible threshold &mdash; is <code>PAY_0</code> above 0, above 1, above 2; is <code>util_mean</code> above 0.3, 0.4, 0.5 &mdash; and measures how much separating the customers that way would reduce its error. That measure is the <em>gain</em>. It keeps the single best split, then repeats the search on each side.</p>
   <p class="measure">Below is one actual first tree from a trained model, not an illustration. One number stands out: its first split scores a gain of <span class="mono">2,254</span>, while the best split anywhere below it scores <span class="mono">248</span> &mdash; nine times smaller.</p>
-  <p class="measure">An important caveat before reading it. This is one tree out of 90 models &times; hundreds of trees each. Change the random seed or the fold and the tree changes. We checked how much: across 30 models, the very first split was <code>PAY_0 &le; 1.5</code> in 13 of them, <code>months_since_late</code> in 12, and the <code>recent_late</code> split shown below in only 5.</p>
-  <p class="measure">But notice what those competing splits all <em>are</em>: was the customer late last month, how recently were they late, how late on average recently. They are four ways of asking one question. Every one of the 30 models opens on recent lateness &mdash; it simply reaches for whichever measure of it happened to be available, since <code>feature_fraction=0.5</code> means each tree only sees half the features. The individual tree is unstable; the pattern it finds is not.</p>
+  <p class="measure">An important caveat before reading it. This is one tree out of 90 models &times; hundreds of trees each; change the seed or the fold and the tree changes. We checked how much: across 30 models, the very first split was <code>PAY_0 &le; 1.5</code> in 13 of them, <code>months_since_late</code> in 12, and the <code>recent_late</code> split shown below in only 5. But notice what those competing splits all <em>are</em> &mdash; four ways of asking whether the customer was recently late. Every one of the 30 models opens on recent lateness; it simply reaches for whichever measure of it happened to be available, since <code>feature_fraction=0.5</code> means each tree only sees half the features. The individual tree is unstable; the pattern it finds is not.</p>
 
 <pre class="trace"><b>recent_late &lt;= 0.75?</b>  gain 2254   &mdash; were they late in the last two months?
 ├─ YES (mostly safe)  → payratio_min ≤ 0.0001?  gain 248
@@ -176,18 +467,11 @@
   <b>converted to a probability                        62.7%</b>
   what actually happened                       they defaulted</pre>
 
-  <p class="measure">Two things to notice. The first tree barely moves the needle &mdash; from &minus;1.2584 to &minus;1.1972, a nudge of 0.06 &mdash; because each tree&rsquo;s influence is deliberately shrunk by the learning rate (0.03). The work is done collectively: 352 trees each contributing a fraction, accumulating to +1.78 in total.</p>
-  <p class="measure">The second tree then trains on <em>what the first got wrong</em>, the third on what the first two still miss, and so on. That is what &ldquo;boosting&rdquo; means, and it is why no single tree needs to be clever.</p>
-  <p class="measure">The model adds in log-odds rather than probabilities, because log-odds can be summed safely while probabilities cannot (two &ldquo;+0.6&rdquo; probabilities would exceed 1). One formula converts back at the end.</p>
+  <p class="measure">Two things to notice. The first tree barely moves the needle &mdash; a nudge of 0.06 &mdash; because each tree&rsquo;s influence is deliberately shrunk by the learning rate (0.03). The work is done collectively: 352 trees each contributing a fraction. The second tree then trains on <em>what the first got wrong</em>, the third on what the first two still miss. That is what &ldquo;boosting&rdquo; means, and it is why no single tree needs to be clever. The model adds in log-odds rather than probabilities, because log-odds can be summed safely while probabilities cannot; one formula converts back at the end.</p>
 
-  <p class="note measure"><strong>Reading trees responsibly.</strong> The customer above is traced through one real model, and its arithmetic is exact. A different seed would route them through different questions and produce a slightly different number &mdash; which is precisely why the final prediction averages 90 of these rather than trusting any one. Individual trees are for understanding the mechanism; only the average is the model.</p>
+  <p class="note measure"><strong>Reading trees responsibly.</strong> The customer above is traced through one real model and its arithmetic is exact. A different seed would route them through different questions and produce a slightly different number &mdash; which is precisely why the final prediction averages 90 of these rather than trusting any one. Individual trees are for understanding the mechanism; only the average is the model.</p>
 
   <p class="measure"><strong>Why keep the trees so short?</strong> Four questions deep means a tree can combine at most four facts about someone. That sounds limiting, but with only 24,000 customers a deeper tree starts carving out branches describing a handful of specific individuals rather than a real pattern. We tested 135 configurations; every deeper or less-constrained one scored worse.</p>
-
-  <figure class="plate">
-    <img src="assets/figures/shap_summary.png" alt="SHAP summary plot ranking features by mean absolute impact on the LightGBM prediction. The top three are months_since_late, PAY_0 and recent_late." loading="lazy">
-    <figcaption><b>What the whole model relies on.</b> SHAP attributions across all customers, ranked by average impact. The single tree above is one draw; this is the aggregate &mdash; and the top three features are <code>months_since_late</code>, <code>PAY_0</code> and <code>recent_late</code>, which is the same &ldquo;four ways of asking one question&rdquo; that the 30 models opened on. Two spending-decomposition features reach the top fifteen.</figcaption>
-  </figure>
 
   <figure class="plate">
     <img src="assets/figures/shap_waterfall_highest_risk.png" alt="SHAP waterfall for the customer scored as highest risk: PAY_0, recent_late and months_since_late push the prediction up to 0.849." loading="lazy">
@@ -198,24 +482,19 @@
     <figcaption><b>And the one it is most sure about in the other direction.</b> The same accounting downward, ending at 0.022. Any single decision can be explained this way, which is what makes the 45%-weight component auditable per customer.</figcaption>
   </figure>
 
-  <h3 style="margin-top:44px;">3.2 &nbsp;GRU: forming an impression while reading the file month by month</h3>
-  <p class="measure">LightGBM sees each customer as one row of summary numbers &mdash; how many times late, average utilisation. Those summaries throw away the order events happened in. The GRU is built to keep that order.</p>
-  <p class="measure">Think of a loan officer reading a customer&rsquo;s file one month at a time, oldest page first, forming an impression as they go and revising it with each new page. That is close to literally what this model does.</p>
+  <h3 style="margin-top:44px;">A.2 &nbsp;GRU: forming an impression while reading the file month by month</h3>
+  <p class="measure">LightGBM sees each customer as one row of summary numbers, and those summaries throw away the order events happened in. The GRU is built to keep that order. Think of a loan officer reading a customer&rsquo;s file one month at a time, oldest page first, forming an impression and revising it with each new page. That is close to literally what this model does.</p>
 
   <h4>What &ldquo;an impression&rdquo; means here</h4>
-  <p class="measure">The model keeps a set of 32 numbers that it updates after every month. These aren&rsquo;t anything a human named &mdash; they&rsquo;re whatever the model found useful to track during training. One might end up representing something like &ldquo;how recently things went wrong&rdquo;, another &ldquo;whether payments are shrinking&rdquo;. We never specify them; they emerge from training. Collectively they&rsquo;re the model&rsquo;s running notes on this customer.</p>
+  <p class="measure">The model keeps a set of 32 numbers that it updates after every month. These aren&rsquo;t anything a human named &mdash; they&rsquo;re whatever the model found useful to track during training. One might end up representing something like &ldquo;how recently things went wrong&rdquo;, another &ldquo;whether payments are shrinking&rdquo;. Collectively they&rsquo;re the model&rsquo;s running notes on this customer.</p>
 
   <h4>What happens at each month</h4>
-  <p class="measure">Each month supplies 8 numbers: repayment status, whether they were late, the bill as a fraction of their limit, the payment as a fraction of their limit, log-scaled bill and payment amounts, the change in balance since last month, and how much of the previous bill the payment covered.</p>
-  <p class="measure">The model then makes two judgements, and this is the part that makes a GRU more than a running average:</p>
+  <p class="measure">Each month supplies the 8 channels listed in &sect;3. The model then makes two judgements, and this is the part that makes a GRU more than a running average:</p>
   <ul class="deflist measure">
     <li><b>How much should this month change my view?</b>A month that looks like the last one barely moves the notes. A sudden missed payment moves them a lot.</li>
     <li><b>How much of my earlier view still matters?</b>If someone has clearly recovered, the model can let old trouble fade rather than holding it against them forever.</li>
   </ul>
-  <p class="measure">Both judgements are made by small formulas the model learned during training &mdash; nobody told it that recent months matter more, or that recovery should count. It worked that out from 24,000 customers&rsquo; outcomes.</p>
-
-  <h4>Reading it twice</h4>
-  <p class="measure">The model reads the six months forwards (oldest to newest) and then again backwards (newest to oldest), producing two sets of notes. Reading backwards lets it interpret an early month with knowledge of how things turned out &mdash; a missed payment in month 6 reads differently once you know months 1&ndash;3 were clean.</p>
+  <p class="measure">Both judgements are made by small formulas the model learned during training &mdash; nobody told it that recent months matter more, or that recovery should count. It worked that out from 24,000 customers&rsquo; outcomes. It then reads the six months forwards and again backwards, producing two sets of notes; reading backwards lets it interpret an early month with knowledge of how things turned out.</p>
 
 <pre class="trace">  month 6 (oldest)   notes ← blank, then updated by month 6
   month 5            notes revised
@@ -228,13 +507,12 @@
 
   <p class="note measure"><strong>The case for including it at all.</strong> Two customers were each late twice. One was late in months 5 and 6 and has paid cleanly since. The other paid cleanly until missing months 1 and 2. Their <code>n_late</code>, <code>pay_max</code> and <code>pay_mean</code> are exactly identical &mdash; LightGBM cannot tell them apart, because the summaries genuinely contain no difference. One is recovering and one is falling apart. Reading months in order separates them, and that is what earned this model 30% of the blend.</p>
 
-  <h3 style="margin-top:44px;">3.3 &nbsp;TabPFN: a model that was trained to learn, not trained on us</h3>
+  <h3 style="margin-top:44px;">A.3 &nbsp;TabPFN: a model that was trained to learn, not trained on us</h3>
   <p class="measure">This one is unusual enough that &ldquo;a pretrained model&rdquo; undersells it. It never trains on our data &mdash; not one pass, not one adjustment to its internals. Two separate things have to happen for it to work, and only the first involves training.</p>
 
   <h4>Part one: what Prior Labs did, long before we showed up</h4>
-  <p class="measure">They built a generator that <em>invents fake datasets</em>. Each starts with an invented cause-and-effect structure &mdash; imaginary variables influencing each other through randomly chosen relationships, with random noise thrown in &mdash; and produces a table of features and outcomes. The table describes nothing real. It&rsquo;s a plausible-shaped dataset from an imaginary world.</p>
-  <p class="measure">They generated millions of these and trained a neural network on one repeated exercise: here are some rows with their answers, and one row without &mdash; what&rsquo;s the answer? Then the dataset is thrown away and the next one is a completely different invented world with different variables and different rules.</p>
-  <p class="measure">Because no dataset ever appears twice, the network cannot memorise any of them. The only thing that helps it improve is getting better at <em>the general skill</em>: look at labelled examples, work out the pattern linking features to outcomes, apply it to a new row. After millions of rounds, that skill is what its internals encode.</p>
+  <p class="measure">They built a generator that <em>invents fake datasets</em>. Each starts with an invented cause-and-effect structure &mdash; imaginary variables influencing each other through randomly chosen relationships, with random noise thrown in &mdash; and produces a table of features and outcomes describing nothing real. They generated millions of these and trained a neural network on one repeated exercise: here are some rows with their answers, and one row without &mdash; what&rsquo;s the answer? Then the dataset is thrown away and the next one is a completely different invented world.</p>
+  <p class="measure">Because no dataset ever appears twice, the network cannot memorise any of them. The only thing that helps it improve is getting better at <em>the general skill</em>: look at labelled examples, work out the pattern linking features to outcomes, apply it to a new row.</p>
 
   <h4>Part two: what happens when we use it</h4>
   <p class="measure">We hand it our 19,200 training customers <em>together with their known outcomes</em>, plus the one customer we want predicted &mdash; all in a single pass. It compares that customer against all 19,200 labelled examples, works out which ones they resemble in the ways that turned out to matter, and produces a probability.</p>
@@ -245,145 +523,8 @@
   out: <b>31.2%</b></pre>
 
   <p class="measure">Nothing about the network changes in the process. Swap in different training customers and its answer changes immediately &mdash; because the training data is an input to it, the way a question is an input, rather than something it absorbs and keeps.</p>
-  <p class="measure"><strong>Why this helps on a dataset our size.</strong> LightGBM and the GRU begin knowing nothing and must learn everything about credit risk from our 24,000 customers. TabPFN arrives already holding sensible general expectations about how tabular data behaves, absorbed from millions of synthetic worlds. It has less to learn from our limited rows &mdash; which is why it matched our fully-tuned GRU with no tuning whatsoever, and why the mistakes it makes differ from models that learned everything here. Different mistakes are exactly what makes an ensemble worth having.</p>
+  <p class="measure"><strong>Why this helps on a dataset our size.</strong> LightGBM and the GRU begin knowing nothing and must learn everything about credit risk from our 24,000 customers. TabPFN arrives already holding sensible general expectations about how tabular data behaves. It has less to learn from our limited rows &mdash; which is why it matched our fully-tuned GRU with no tuning whatsoever, and why the mistakes it makes differ from models that learned everything here. Different mistakes are exactly what makes an ensemble worth having.</p>
   <p class="measure"><strong>What it costs.</strong> The trained network is external and licence-gated, it needs the entire training set handed to it every time it predicts, and it slows down as that set grows &mdash; about six minutes per fold here, against seconds for LightGBM.</p>
-</section>
-
-<section id="blend">
-  <div class="sechead"><span class="no">4</span><h2>How the three become one number</h2></div>
-  <p class="lede measure">A plain weighted average of the three probabilities &mdash; no meta-model, no per-customer switching. Both of those were tested and were among the worst results recorded.</p>
-
-  <h3 style="margin-top:30px;">How the weights were chosen</h3>
-  <p class="measure">Grid search here means exactly what it sounds like: try every combination and keep the best. Nothing is being fitted &mdash; three numbers are being <em>looked up</em>.</p>
-  <ul class="deflist measure">
-    <li><b>Collect three prediction vectors</b>Each model produced a probability for all 24,000 training customers &mdash; crucially, from out-of-fold predictions, where every customer was scored by a model that never saw their label during training. Those numbers are honest stand-ins for unseen data.</li>
-    <li><b>Enumerate the possibilities</b>Step each weight in increments of 0.05, keeping only combinations summing to 1: (1.00, 0, 0), (0.95, 0.05, 0), (0.95, 0, 0.05) &hellip; about 230 valid triples in total.</li>
-    <li><b>Score each one</b>For a candidate like (0.5, 0.3, 0.2), compute the blended probability for all 24,000 customers and measure the log loss against the true outcomes. One number per candidate.</li>
-    <li><b>Keep the lowest</b>(0.45, 0.30, 0.25) scored 0.42136, the best of the 230.</li>
-  </ul>
-
-  <div class="tbl-wrap">
-  <table class="data" style="min-width:480px;">
-    <caption>Selected candidates from the 230, with distance from the best score.</caption>
-    <thead>
-      <tr><th scope="col">Weights (LGBM / GRU / TabPFN)</th><th scope="col" class="n">OOF log loss</th><th scope="col">Distance from best</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>(1.00, 0.00, 0.00) &nbsp;<span class="flat">lgbm only</span></td><td class="n">0.42211</td><td><span class="pbar" style="width:200px"></span></td></tr>
-      <tr><td>(0.65, 0.35, 0.00) &nbsp;<span class="flat">no tabpfn</span></td><td class="n">0.42155</td><td><span class="pbar" style="width:51px"></span></td></tr>
-      <tr><td>(0.55, 0.30, 0.15)</td><td class="n">0.42141</td><td><span class="pbar" style="width:13px"></span></td></tr>
-      <tr class="hl"><td>(0.45, 0.30, 0.25) &nbsp;selected</td><td class="n">0.42136</td><td><span class="pbar sel" style="width:2px"></span></td></tr>
-      <tr><td>(0.34, 0.33, 0.33) &nbsp;<span class="flat">equal weights</span></td><td class="n">0.42147</td><td><span class="pbar" style="width:29px"></span></td></tr>
-    </tbody>
-  </table>
-  </div>
-
-  <p class="measure" style="margin-top:20px;"><strong>The flatness is the reassuring part.</strong> Notice how little separates those rows. Every weighting from 0.50 to 0.70 on LightGBM lands within 0.0001, so the optimum is a broad plateau rather than a sharp peak. A sharp peak would suggest the weights had latched onto noise in these particular 24,000 rows; a plateau means almost any sensible weighting performs the same, and the exact choice barely matters.</p>
-  <p class="measure">We tested that directly: shrinking the weights halfway toward equal &mdash; the standard remedy for weights overfitted to validation data &mdash; made the hidden-test score <em>worse</em>. That test was run at the two-model stage, where shrinking scored 0.41045 against 0.41032; the weight surface has remained just as flat since TabPFN joined, so the conclusion still holds for the three-way blend. The fitted weights needed no correction. This is also the one step in the pipeline where genuine selection happens, so it is where overfitting risk lives; the flat surface and the failed shrinkage test are the evidence that the risk did not materialise.</p>
-
-  <p class="measure">For a customer where LightGBM says 30%, the GRU says 20% and TabPFN says 25%, the submitted probability is <code>0.45&times;0.30 + 0.30&times;0.20 + 0.25&times;0.25 = 26%</code>. The averaging is mathematically safe for this metric: log loss is convex, so by Jensen&rsquo;s inequality the loss of an averaged prediction never exceeds the average of the individual losses.</p>
-
-  <h3 style="margin-top:30px;">Why nothing is calibrated afterwards</h3>
-  <p class="measure"><strong>No calibration is applied</strong>, and that is a finding rather than an omission. Platt scaling, isotonic regression, per-segment calibration and base-rate shrinkage were each tested under nested cross-validation; all made log loss worse, and the shrinkage search independently selected &alpha; = 1.0, meaning &ldquo;do not adjust&rdquo;.</p>
-
-  <figure class="plate" style="max-width:520px;">
-    <img src="assets/figures/reliability_diagram.png" alt="Reliability diagram: mean predicted probability against observed default rate per decile bin, sitting on the diagonal." loading="lazy">
-    <figcaption><b>The fourth independent check.</b> Predicted probability against observed default rate, per decile. Both components track the diagonal across the whole range, which is what &ldquo;the probabilities can be read as probabilities&rdquo; means in practice &mdash; and why every correction we fitted made things worse.</figcaption>
-  </figure>
-</section>
-
-<section id="provenance">
-  <div class="sechead"><span class="no">5</span><h2>How we arrived here</h2></div>
-  <p class="lede measure">Eight submissions, each building on the last. The two large gains came from different sources &mdash; one from information, one from a representation.</p>
-
-  <div class="tbl-wrap">
-  <table class="data">
-    <thead>
-      <tr><th scope="col">Step</th><th scope="col">Change</th><th scope="col" class="n">Score</th><th scope="col" class="n">Gain</th></tr>
-    </thead>
-    <tbody>
-      <tr><td class="n">1</td><td>Log-loss alignment + GRU added to LightGBM</td><td class="n">0.41260</td><td class="n flat">baseline</td></tr>
-      <tr><td class="n">2</td><td>Full-data refit for the GRU</td><td class="n">0.41237</td><td class="n up">&minus;0.00023</td></tr>
-      <tr><td class="n">3</td><td>Repeated cross-validation, 3 partitions</td><td class="n">0.41211</td><td class="n up">&minus;0.00026</td></tr>
-      <tr><td class="n">4</td><td>Repeated cross-validation, 6 partitions</td><td class="n">0.41211</td><td class="n flat">0.00000</td></tr>
-      <tr class="hl"><td class="n">5</td><td>Spending decomposition features + tuned GRU</td><td class="n">0.41038</td><td class="n up">&minus;0.00173</td></tr>
-      <tr><td class="n">6</td><td>Pure full-data refit for LightGBM</td><td class="n">0.41032</td><td class="n up">&minus;0.00006</td></tr>
-      <tr><td class="n">7</td><td>TabPFN added to the blend</td><td class="n">0.40995</td><td class="n up">&minus;0.00037</td></tr>
-      <tr><td class="n">8</td><td>TabPFN raised to 6 partitions + full-data refit</td><td class="n">0.40982</td><td class="n up">&minus;0.00013</td></tr>
-    </tbody>
-  </table>
-  </div>
-
-  <p class="note measure"><strong>The single largest gain came from an accounting identity.</strong> The data gives statement balances and payments but never the amount <em>charged</em>; since <code>BILL_t = BILL_(t+1) &minus; PAY_AMT_t + spend_t</code>, monthly spending can be recovered. A balance rising because someone is spending is a different risk story from one rising because they stopped paying, and no existing feature could tell those apart.</p>
-  <p class="measure">The full sequence including the submission that regressed, and every experiment that never reached a submission, is in the <a href="experiment-ledger.html#survived">experiment ledger</a>.</p>
-</section>
-
-<section id="assessment">
-  <div class="sechead"><span class="no">6</span><h2>What it does well, and where it is weak</h2></div>
-
-  <div class="two">
-    <div>
-      <h3>Advantages</h3>
-      <ul class="deflist">
-        <li><b>Three genuinely different inductive biases</b>Aggregate statistics, temporal sequence, and a pretrained prior. Diversity is structural rather than cosmetic &mdash; models that merely differed in algorithm (CatBoost, ExtraTrees, logistic regression) all received weight zero.</li>
-        <li><b>Calibrated without post-processing</b>Probabilities can be read as probabilities. Four independent calibration tests each concluded no adjustment was warranted, which matters for a lender setting its own risk thresholds.</li>
-        <li><b>Low variance by construction</b>270 cross-validated fits across six fold partitions, plus 11 full-data refits, stand behind each prediction. Averaging involves no parameter selection, so it cannot overfit &mdash; it is the one component of the design with a mathematical guarantee.</li>
-        <li><b>Interpretable where it counts</b>The 45%-weight component is a tree model with SHAP attributions available per customer, so any individual decision can be explained by feature contribution.</li>
-        <li><b>No fragile tricks</b>No pseudo-labelling, no rank transforms, no leaderboard-fitted post-processing. Every step was validated out-of-fold before being adopted.</li>
-      </ul>
-    </div>
-    <div>
-      <h3>Disadvantages</h3>
-      <ul class="deflist">
-        <li><b>Most of the value sits in one model</b>LightGBM alone reaches 0.42211 out-of-fold; all three together reach 0.42136. The other two components add roughly 0.0007 for 180 extra model fits and two additional dependencies. The ensemble is expensive relative to its marginal gain.</li>
-        <li><b>TabPFN is a reproducibility liability</b>It needs a Prior Labs licence, an API token and a weights download, and takes ~50 minutes to run. Anyone reproducing this must clear those gates &mdash; a real cost for 0.2 of the blend.</li>
-        <li><b>Blend weights are fitted to validation data</b>Unlike the averaging, weight selection is a genuine selection step and carries overfitting risk. Mitigated but not eliminated: the surface is flat, and shrinking toward uniform made the score worse, both of which suggest the fit is stable.</li>
-        <li><b>Compute cost is substantial</b>A full retrain is several hours, dominated by 150 GRU fits and TabPFN&rsquo;s context-length scaling. Iteration is slow, which limited how many ideas could be tested near the deadline.</li>
-        <li><b>Some of the target is unreachable</b>The twenty worst-predicted customers are all defaulters the model rated at 2&ndash;4% risk, every one with a spotless payment record. Whatever drove those defaults is absent from the data, and no model over these columns can recover it.</li>
-      </ul>
-    </div>
-  </div>
-
-  <div class="callout measure">
-    <p><strong>The honest summary of the ceiling.</strong> Forty-one experiments were run; four produced gains that survived. Seven model families, six feature families, 135 hyperparameter configurations, eight ensembling and calibration schemes, and five techniques borrowed from the winners of a larger credit-default competition all failed to improve on what is described here. Gains came only from deriving information the data did not already state, or from averaging more of the same models &mdash; never from a more sophisticated algorithm.</p>
-  </div>
-</section>
-
-<section id="next">
-  <div class="sechead"><span class="no">7</span><h2>What we would try next, and why we stopped</h2></div>
-  <p class="lede measure">Work stopped at the submission deadline, not at the point where ideas ran out. These are the specific things left on the table, with an honest estimate of what each was worth &mdash; recorded so the stopping point is a documented decision rather than an unexplained gap.</p>
-
-  <h3 style="margin-top:30px;">Ranked by expected value</h3>
-  <div class="next">
-    <div class="item">
-      <h3>1 &nbsp;TabPFN internal ensembling</h3>
-      <p>TabPFN ran with <code>n_estimators=4</code>, its own internal ensembling parameter &mdash; the number of times it re-reads the data under different feature orderings and permutations before averaging. Raising it to 8 or 16 improves <em>the quality of each fit</em>, which is different from the repeated cross-validation we already exhausted (that averages more fits of the same quality). It is the only genuinely untested knob remaining on the winning configuration.</p>
-      <p class="why"><b>Why not done:</b> the run at <code>n_estimators=4</code> took 3h 10m. Doubling the parameter plausibly doubles that, and under 4 hours remained before the deadline &mdash; with no way to submit a partial result.</p>
-      <p class="why"><b>An avoidable cost:</b> TabPFN was run on CPU. It was set that way on the first pilot to sidestep a possible incompatibility with Apple&rsquo;s Metal backend, and never revisited. Tested afterwards, <code>device="mps"</code> works correctly and is faster even on a small subset (4.8s against 6.8s on 3,000 rows, with identical predictions to float precision). Since GPU advantage grows with batch size, the full run would plausibly have taken about an hour rather than three &mdash; which would have made this experiment affordable before the deadline. The constraint was a wrong assumption, not the hardware.</p>
-    </div>
-    <div class="item">
-      <h3>2 &nbsp;A GRU trained on more channels</h3>
-      <p>The sequence model reads 8 channels per month. The spending-decomposition features that produced our largest single gain are supplied to it only as flattened static inputs, never as an ordered per-month trajectory. We tested exactly this and measured +0.00002 &mdash; but at 3 partitions rather than 6, and with the spending features already present as statics in both arms, so the test isolated only whether ordering helps. A cleaner design would compare against a GRU with no spending information at all.</p>
-      <p class="why"><b>Why not done:</b> the measured effect was inside noise, and the cleaner experiment needs two full GRU runs at roughly 50 minutes each.</p>
-    </div>
-    <div class="item">
-      <h3>3 &nbsp;More TabPFN fold partitions</h3>
-      <p>TabPFN carries 25% of the blend on 30 fold-fits, against LightGBM&rsquo;s 90 and the GRU&rsquo;s 150. It remains the least-averaged component, so it sits earliest on the variance-reduction curve where each doubling buys proportionally more.</p>
-      <p class="why"><b>Why not done:</b> going 3&rarr;6 partitions moved out-of-fold log loss by 0.00002. The leaderboard gained 0.00013, but that came mostly from the full-data refit added in the same run &mdash; which now exists and cannot be added twice. A further doubling is another three hours for a likely smaller return.</p>
-    </div>
-  </div>
-
-  <h3 style="margin-top:40px;">Considered and rejected on evidence</h3>
-  <ul class="deflist measure">
-    <li><b>An eighth model family</b>Ten were tried; three earned weight. The three that worked read the data differently &mdash; as aggregates, as a sequence, through a pretrained prior. Every model that was merely a different algorithm over the same view (CatBoost, ExtraTrees, logistic regression, an autoencoder, a 1D-CNN, a multi-task variant) received weight 0.00. We would need a genuinely fourth way of viewing a customer, and we could not name one.</li>
-    <li><b>More feature engineering</b>Seven families tried, one worked. The one that worked recovered a quantity the dataset never states; the six that failed recombined or re-summarised information already present. Without a second such quantity to derive, more features means more noise.</li>
-    <li><b>Anything calibration- or ensembling-related</b>Eight schemes tested, all worse than a plain weighted average. Three independent checks agree the probabilities need no adjustment. This avenue is closed rather than unexplored.</li>
-    <li><b>Chasing the leaderboard further</b>At the point of stopping we sat 0.00015 behind first, having gained 0.00013 in the final round while the leader gained 0.00014. Continuing meant multi-hour runs for sub-0.0001 expected gains against a moving target, with the submission materials already complete.</li>
-  </ul>
-
-  <div class="callout measure">
-    <p><strong>The honest position at the deadline.</strong> None of the remaining ideas is worth more than roughly 0.0001 on the evidence available, and each costs hours. That is not a claim the model cannot be improved &mdash; the leader demonstrably has more &mdash; but the levers we can still name are exhausted, and the ones we would reach for next are the ones already measured as saturating. A better result would most likely require a genuinely new insight about the data rather than more of what is described in this document.</p>
-  </div>
 </section>
 
 <footer class="doc-foot">

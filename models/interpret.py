@@ -10,7 +10,7 @@ the submission. Answers the brief's explicit "interpretability" and
    does "30% predicted default" actually default ~30% of the time, per the
    calibration-diagnostics literature (Röchner et al. 2024).
 
-Run after model.py/nn_model.py/blend.py. Writes PNGs to output/analysis/.
+Run after lgbm_model.py/nn_model.py/blend.py. Writes PNGs to output/analysis/.
 """
 
 from pathlib import Path
@@ -24,7 +24,7 @@ import shap
 from sklearn.calibration import calibration_curve
 
 from common import OUT, folds, load
-from model import PARAMS
+from lgbm_model import PARAMS
 
 OUT_DIR = Path("output/analysis")
 

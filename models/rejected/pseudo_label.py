@@ -13,7 +13,7 @@ contaminated:
        1-p (LightGBM's binary objective needs 0/1 labels, and this is the
        weighted-duplicate encoding of a soft target), scaled by W.
     3. refit on train-fold + pseudo rows, early stopped on the validation fold
-       exactly as model.py does, and predict the validation fold.
+       exactly as lgbm_model.py does, and predict the validation fold.
 
   The baseline arm is the identical model without step 2, run on the same
   folds and seeds, so the difference is the pseudo-labels and nothing else.
@@ -36,8 +36,14 @@ import lightgbm as lgb
 from sklearn.metrics import log_loss, roc_auc_score
 from sklearn.model_selection import StratifiedKFold
 
+import sys
+from pathlib import Path
+
+# This script lives one level below the pipeline modules it imports.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from common import folds, load, save, score
-from model import PARAMS
+from lgbm_model import PARAMS
 
 WEIGHTS = (0.25, 0.5, 1.0)   # total weight given to the pseudo rows
 SEED = 0

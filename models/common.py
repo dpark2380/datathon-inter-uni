@@ -1,6 +1,6 @@
 """Shared data loading and feature engineering for the default-probability models.
 
-Both model.py (LightGBM) and nn_model.py (MLP) build their matrices here so
+Both lgbm_model.py (LightGBM) and rejected/nn_model.py (MLP) build their matrices here so
 their out-of-fold predictions use identical rows, columns and CV folds and can
 be blended directly.
 """

@@ -74,7 +74,7 @@ def main():
     # in-context learning, so the training rows ARE the evidence it reasons
     # from, and a refit gives it 25% more context rather than more gradient
     # steps. LightGBM and the GRU both already have this; TabPFN did not.
-    # Averaged 50/50 with the fold ensemble, matching model.py and seq_model.py.
+    # Averaged 50/50 with the fold ensemble, matching lgbm_model.py and seq_model.py.
     print("\nfull-data refit on all 24k rows", flush=True)
     full = np.zeros(len(Xt))
     REFIT_SEEDS = (0, 1, 2)

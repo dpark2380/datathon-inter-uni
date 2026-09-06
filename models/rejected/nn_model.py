@@ -18,6 +18,12 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
+import sys
+from pathlib import Path
+
+# This script lives one level below the pipeline modules it imports.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from common import CATS, folds, load, save, score
 
 # A wider or deeper net does not help -- (128,64) and (256,128) both scored

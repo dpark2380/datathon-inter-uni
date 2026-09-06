@@ -1,6 +1,6 @@
 """Blend the LightGBM, GRU-sequence and TabPFN predictions into the submission.
 
-Run model.py, seq_model.py and tabpfn_model.py first; this reads the vectors
+Run lgbm_model.py, seq_model.py and tabpfn_model.py first; this reads the vectors
 they saved, searches the weight simplex for the combination that minimises OOF
 log loss (the competition's actual metric), checks whether a Platt or isotonic
 recalibration lowers it further, and writes .output/predictions_blend.csv --
@@ -11,7 +11,7 @@ Two details that matter for reproducing the submitted result:
   * The LightGBM component uses test_lgbm_full.npy, the PURE full-data refit,
     not the 50/50 fold/refit mix in test_lgbm.npy. Submitting the latter scored
     0.41038 where the former scored 0.41032 when tested in isolation.
-  * nn_model.py's MLP is deliberately absent. The weight search drove it to
+  * rejected/nn_model.py's MLP is deliberately absent. The weight search drove it to
     0.00 from the moment the GRU existed -- the GRU does the same job better --
     so it is kept in the repo as a tested-and-rejected model rather than
     carried here.
@@ -39,7 +39,7 @@ def main():
         test["lgbm"] = np.load(OUT / "test_lgbm_full.npy")
     except FileNotFoundError as e:
         raise SystemExit(
-            f"missing {e.filename} -- run model.py, seq_model.py and tabpfn_model.py first"
+            f"missing {e.filename} -- run lgbm_model.py, seq_model.py and tabpfn_model.py first"
         )
 
     for m in MODELS:

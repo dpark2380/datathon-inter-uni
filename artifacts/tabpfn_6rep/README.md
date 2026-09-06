@@ -29,14 +29,14 @@ pd.DataFrame({"client_id": ids, "prob_default": preds}).to_csv("submissions/subm
 ```
 
 Note the LightGBM component is the **pure full-data refit** (`test_lgbm_full.npy`),
-not the 50/50 fold/refit mix that `models/model.py` writes to `test_lgbm.npy`. Using the
+not the 50/50 fold/refit mix that `models/lgbm_model.py` writes to `test_lgbm.npy`. Using the
 latter produces a different, slightly worse file (0.41038 vs 0.41032 when that
 change was tested in isolation).
 
 ## Retraining from scratch
 
 ```bash
-uv run python models/model.py                                  # ~10 min, writes both lgbm components
+uv run python models/lgbm_model.py                                  # ~10 min, writes both lgbm components
 uv run python models/seq_model.py                              # ~50 min, GRU + refit
 TABPFN_TOKEN="<token>" uv run --with tabpfn python models/tabpfn_model.py   # ~3h 10m
 uv run python models/blend.py                                  # weight search + submission

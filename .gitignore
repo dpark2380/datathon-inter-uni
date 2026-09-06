@@ -1,12 +1,11 @@
-.claude/settings.local.json
-.output
-# Python
-__pycache__/
-*.pyc
-.venv/
 
 # CatBoost training logs
-catboost_info/
-
+# Python
 # graphify build output
+*.pyc
+.claude/settings.local.json
+.output
+.venv/
+__pycache__/
+catboost_info/
 graphify-out/

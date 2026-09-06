@@ -25,16 +25,22 @@ are already well calibrated (see `output/analysis/reliability_diagram.png`).
 ### Without retraining (seconds)
 
 Saved prediction vectors are committed, so the exact submitted file can be
-rebuilt without running any model. See `artifacts/tabpfn_6rep/README.md`.
+rebuilt without running any model. See `artifacts/tabpfn_6rep/README.md`
+(verified: maximum absolute difference 9.71e-17 across all 6,000 rows).
+
+The out-of-fold vectors are committed too, so the **blend weight search is also
+reproducible in seconds** — it re-derives `(0.45, 0.30, 0.25)` at OOF log loss
+0.421358 from `artifacts/oof_lgbm.npy`, `artifacts/oof_seq.npy` and
+`artifacts/tabpfn_6rep/oof_tabpfn_6rep.npy` without retraining anything.
 
 ### From scratch
 
 ```bash
-uv sync                          # installs everything in pyproject.toml
-uv run python models/model.py           # LightGBM        ~10 min
-uv run python models/seq_model.py       # GRU             ~50 min
-TABPFN_TOKEN="<token>" uv run python models/tabpfn_model.py   # TabPFN  ~1 h on Apple GPU
-uv run python models/blend.py           # weight search + writes the submission
+uv sync                                                      # installs everything in pyproject.toml
+uv run python models/lgbm_model.py                           # LightGBM  ~10 min
+uv run python models/seq_model.py                            # GRU       ~50 min
+TABPFN_TOKEN="<token>" uv run python models/tabpfn_model.py  # TabPFN    ~1 h on Apple GPU
+uv run python models/blend.py                                # weight search + writes the submission
 ```
 
 `models/blend.py` writes `.output/predictions_blend.csv`. **That is the submitted
@@ -61,7 +67,7 @@ Everything is deterministic given these:
 |---|---|---|
 | Fold seed | `SEED = 0` | `models/common.py` |
 | Fold partitions | `REPEATS = range(6)` — 6 × 5-fold stratified | `models/common.py` |
-| LightGBM seeds | `(0, 1, 2)` per fold → 90 models | `models/model.py` |
+| LightGBM seeds | `(0, 1, 2)` per fold → 90 models | `models/lgbm_model.py` |
 | GRU seeds | `range(5)` per fold → 150 models | `models/seq_model.py` |
 | TabPFN | 6 partitions → 30 fits, `n_estimators=4` | `models/tabpfn_model.py` |
 | Blend weights | searched on OOF log loss, 0.05 grid | `models/blend.py` |
@@ -71,31 +77,49 @@ the fold ensemble for the test predictions.
 
 ## Files
 
-**The pipeline**
+**The pipeline, in execution order**
 
-| File | Role |
-|---|---|
-| `models/common.py` | data loading, cleaning, 81-feature engineering, the shared CV splits |
-| `models/model.py` | LightGBM |
-| `models/seq_model.py` | bidirectional GRU over the 6-month panel |
-| `models/tabpfn_model.py` | TabPFN |
-| `models/blend.py` | weight search, calibration check, **writes the final submission** |
+| # | File | Role |
+|---|---|---|
+| 1 | `1_EDA.ipynb` | Exploratory analysis — distributions, the target base rate, how each raw column behaves |
+| 2 | `2_Data_Cleaning.ipynb` | Column-level inspection (unique values, null counts) that identified the undocumented category codes |
+| 3 | `models/common.py` | The spine: `clean()`, `features()` (81 features), `load()`, `folds()`, `score()`, `save()`. Every script below calls it |
+| 4 | `models/lgbm_model.py` | LightGBM — 90 fold fits + 3-seed full-data refit |
+| 5 | `models/seq_model.py` | Bidirectional GRU over the 6 × 8 monthly panel — 150 fits + refit |
+| 6 | `models/tabpfn_model.py` | TabPFN — 30 fits + refit |
+| 7 | `models/blend.py` | Weight search, calibration check, **writes the final submission** |
 
-**Analysis**
+Steps 4–6 are independent of each other and can run in any order; step 7 reads
+the `.npy` vectors they save. Steps 1–2 are documentation of how the cleaning
+decisions were reached — the cleaning itself is `common.clean()`, so nothing
+needs to be run before step 3.
+
+**Analysis (not on the submission path)**
 
 | File | Role |
 |---|---|
 | `models/interpret.py` | SHAP explanations and the reliability diagram |
-| `models/fairness_audit.py` | per-subgroup calibration and ranking, by sex, education, marriage and age |
+| `models/fairness_audit.py` | Per-subgroup calibration and ranking, by sex, education, marriage and age |
 
-**Tested and rejected** — kept as a record of what was tried, not part of the
-pipeline. See `docs/experiment-ledger.html` for measured results.
+**Tested and rejected** — `models/rejected/`, nine scripts kept as a record of
+what was tried. Each was rejected by the same weight search that set the final
+weights. See `models/rejected/README.md` for the table, and
+`docs/experiment-ledger.html` for the measured deltas.
 
-`models/nn_model.py` (MLP) · `models/cnn_model.py` · `models/attn_model.py` (transformer, never
-completed a full run) · `models/autoenc_model.py` · `models/multitask_model.py` ·
-`models/survival_model.py` · `models/seq_spend_model.py` · `models/pseudo_label.py`
+**Data and artifacts**
 
-**Documentation** — `docs/`, and `artifacts/` for saved prediction vectors.
+| Path | What it is |
+|---|---|
+| `datasets/train.csv`, `datasets/test.csv` | Competition-provided, unmodified |
+| `datasets/train_clean.csv` | `train.csv` with the two category substitutions of `common.clean()`. Committed; regenerable in one command (see `REPORT.md` §4) |
+| `artifacts/oof_lgbm.npy`, `artifacts/oof_seq.npy`, `artifacts/tabpfn_6rep/` | Out-of-fold vectors — enough to re-run the blend weight search in seconds without retraining |
+| `artifacts/test_lgbm_full.npy`, `artifacts/test_seq.npy`, `artifacts/tabpfn_6rep/` | Test vectors — enough to rebuild the exact submitted file |
+| `submissions/` | Every submitted prediction file; `submission_tabpfn6.csv` is the final one |
+| `output/analysis/` | SHAP plots, reliability diagram, fairness audit |
+
+**Documentation** — `REPORT.md` (full submission report), `Methodology.md`, and
+`docs/` (published at
+[dpark2380.github.io/datathon-inter-uni](https://dpark2380.github.io/datathon-inter-uni/)).
 
 ## Disclosure
 

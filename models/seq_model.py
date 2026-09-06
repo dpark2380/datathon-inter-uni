@@ -8,7 +8,7 @@ up trajectories the aggregates destroy (e.g. "recovering after a bad patch" vs
 "deteriorating" can share the same mean/max/streak).
 
 The engineered static features are concatenated onto the GRU's final hidden
-state, so the model sees both views rather than competing with model.py's
+state, so the model sees both views rather than competing with lgbm_model.py's
 feature work.
 
 Same 5-fold CV as everything else via common.folds, so the OOF vector lines up
@@ -97,7 +97,7 @@ def fit_predict(seq_tr, st_tr, y_tr, seq_va, st_va, y_va, seq_te, st_te, seed,
     """Train one net with early stopping on validation log loss.
 
     make_model lets a different architecture reuse this loop unchanged --
-    cnn_model.py passes its own factory rather than duplicating the training
+    rejected/cnn_model.py passes its own factory rather than duplicating the training
     code.
     """
     torch.manual_seed(seed)
@@ -146,7 +146,7 @@ def fit_predict(seq_tr, st_tr, y_tr, seq_va, st_va, y_va, seq_te, st_te, seed,
 def fit_full(seq_tr, st_tr, y_tr, seq_te, st_te, seed, epochs, make_model=None):
     """Refit on ALL training rows for a fixed epoch count (no validation set to
     early-stop on, so we reuse the average best epoch from CV -- same trick
-    model.py uses with the average best boosting iteration).
+    lgbm_model.py uses with the average best boosting iteration).
 
     The fold models each see only 80% of the data; this one sees 100%, and the
     two are averaged for the test predictions.
@@ -248,7 +248,7 @@ def main():
     # Refit on all 24k rows at the average best epoch and average with the fold
     # ensemble. The OOF above cannot measure this -- it only ever sees 80%-data
     # fold models -- but the test predictions get a model trained on 25% more
-    # data, same rationale as model.py's full refit.
+    # data, same rationale as lgbm_model.py's full refit.
     n_epochs = max(1, int(np.mean(epochs_used)))
     print(f"\nfull-data refit at {n_epochs} epochs (avg best epoch across CV)", flush=True)
     static, norm = preprocessors(X, seq_all, np.arange(len(X)))   # fitted on everything

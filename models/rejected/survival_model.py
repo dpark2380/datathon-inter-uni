@@ -29,9 +29,15 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import log_loss, roc_auc_score
 
+import sys
+from pathlib import Path
+
+# This script lives one level below the pipeline modules it imports.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from common import (AMT, BILL, CATS, ID, REPEATS, TARGET, clean, features,
                     folds, load, save, score)
-from model import PARAMS
+from lgbm_model import PARAMS
 
 EPS = 1e-7
 STATIC = ["LIMIT_BAL", "SEX", "EDUCATION", "MARRIAGE", "AGE"]

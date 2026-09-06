@@ -27,7 +27,7 @@ Below 1 means the model beats that baseline; closer to 0 is better. Compare
 groups on `skill` and `auc`, not on raw log loss.
 
 Reads the out-of-fold predictions of the shipped blend, so these are honest
-estimates on unseen rows. Run model.py, seq_model.py and tabpfn_model.py first.
+estimates on unseen rows. Run lgbm_model.py, seq_model.py and tabpfn_model.py first.
 """
 
 import numpy as np
@@ -95,7 +95,7 @@ def main():
         p = sum(w * np.load(OUT / f"oof_{m}.npy") for m, w in WEIGHTS.items())
     except FileNotFoundError as e:
         raise SystemExit(
-            f"missing {e.filename} -- run model.py, seq_model.py and tabpfn_model.py first"
+            f"missing {e.filename} -- run lgbm_model.py, seq_model.py and tabpfn_model.py first"
         )
 
     print(f"blend OOF log loss {log_loss(y, p):.5f}   base rate {y.mean():.4f}   n = {len(y)}")

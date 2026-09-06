@@ -22,6 +22,12 @@ from sklearn.impute import SimpleImputer
 from sklearn.metrics import log_loss, roc_auc_score
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
+import sys
+from pathlib import Path
+
+# This script lives one level below the pipeline modules it imports.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from common import AMT, BILL, CATS, ID, PAY, TARGET, clean, folds, load, save, score
 import seq_model as S
 
