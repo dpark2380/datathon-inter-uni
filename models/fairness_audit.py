@@ -1,33 +1,32 @@
-"""Subgroup performance and calibration audit.
+"""Fairness audit: does the shipped blend treat demographic subgroups fairly?
 
-The competition brief asks teams to consider "responsible use of demographic
-information". This reports, per subgroup, whether the model's probabilities
-mean the same thing and whether it ranks as well.
+Run after lgbm_model.py, seq_model.py and tabpfn_model.py -- reads their
+saved out-of-fold predictions, so results are honest on unseen rows. Prints
+one table per group (SEX, EDUCATION, MARRIAGE, AGE band): group size,
+default rate, mean predicted risk, calibration ratio, skill, and AUC.
 
-Three questions, which are different and easily confused:
+Why: the competition brief asks teams to consider "responsible use of
+demographic information". That splits into three different questions,
+easily confused:
 
   1. Does it PREDICT more risk for some groups?   (mean predicted)
      A gap here may simply reflect a real difference in outcomes.
 
-  2. Do its probabilities MEAN the same thing?    (calibration ratio)
+  2. Do its probabilities MEAN the same thing?    (calib ratio)
      The one that matters most for a lender: if "20% risk" is really 30% for
      one group and 15% for another, a single threshold applies a harsher
      standard to the first group even though the number is identical.
 
-  3. Does it RANK as well within each group?      (AUC, skill)
+  3. Does it RANK as well within each group?      (auc, skill)
      Worse ranking means worse decisions for those people.
 
-A note on log loss, because it is easy to misread. Raw log loss is NOT
-comparable across groups with different base rates -- a group defaulting at 7%
-has a lower achievable loss than one at 25%, regardless of model quality. In
-this dataset EDUCATION="other" posts the best raw loss of any group while
-having the worst AUC. The `skill` column corrects for that: it divides each
-group's loss by the loss of simply predicting that group's own base rate.
-Below 1 means the model beats that baseline; closer to 0 is better. Compare
-groups on `skill` and `auc`, not on raw log loss.
-
-Reads the out-of-fold predictions of the shipped blend, so these are honest
-estimates on unseen rows. Run lgbm_model.py, seq_model.py and tabpfn_model.py first.
+Raw log loss can't answer #3 on its own -- it isn't comparable across groups
+with different base rates (a 7%-default group has a lower achievable loss
+than a 25% one, regardless of model quality -- EDUCATION="other" has the
+best raw loss here despite the worst AUC). `skill` fixes this: each group's
+loss divided by the loss of predicting that group's own base rate. Below 1
+beats that baseline; closer to 0 is better. Compare groups on `skill` and
+`auc`, never on raw log loss.
 """
 
 import numpy as np
@@ -51,9 +50,9 @@ def audit(name, groups, p, y):
     for label, m in groups.items():
         n = int(m.sum())
         if n < MIN_ROWS or not 0 < y[m].mean() < 1:
-            # never drop a group silently -- in a fairness audit the smallest
-            # groups are the ones most at risk of being under-served, and
-            # omitting them flatters the spread figures below
+            # Never drop a group silently: in a fairness audit, the smallest
+            # groups are most at risk of being under-served, and omitting
+            # them would flatter the spread figures below.
             skipped.append((label, n))
             continue
         actual, pred = y[m].mean(), p[m].mean()

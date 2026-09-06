@@ -21,24 +21,22 @@ AMT = [f"PAY_AMT{i}" for i in range(1, 7)]
 CATS = ["SEX", "EDUCATION", "MARRIAGE"]
 SEED = 0
 MIN_PAY_RATE = 0.10
-# Fold-split seeds to repeat CV over. Repeated CV is the one lever the OOF
-# score cannot measure: each OOF row is predicted by its own fold's models
-# only, while every test row is predicted by the average of all of them. The
-# leaderboard confirmed this gap is real (OOF 0.4227 vs actual 0.4126).
+# Seeds to repeat CV over. This covers a gap the OOF score can't see: each
+# OOF row comes from one fold's model, but each test row is averaged over
+# all folds. The leaderboard confirmed the gap is real (OOF 0.4227 vs actual
+# 0.4126 without repeats).
 REPEATS = tuple(range(6))
 
 
 def clean(df):
-    """Collapse the undocumented category codes onto 'other'.
+    """Map undocumented category codes onto 'other'.
 
-    EDUCATION {0, 5, 6} -> 4 and MARRIAGE {0} -> 3. The data dictionary defines
-    1-4 and 1-3 respectively; the extra codes cover a small tail and behave like
-    'other'. 2_Column_Inspection.ipynb is where they were found, not where they
-    are fixed -- this function is the only implementation, so train and test are
-    treated identically.
+    EDUCATION {0, 5, 6} -> 4, MARRIAGE {0} -> 3 (the data dictionary only
+    defines 1-4 and 1-3). Found during EDA in 2_Column_Inspection.ipynb, but
+    fixed only here so train and test always get identical treatment.
 
-    Idempotent, so it is safe to call on datasets/train_clean.csv, which already
-    has it applied.
+    Idempotent -- safe to call again on train_clean.csv, which already has
+    this applied.
     """
     df = df.copy()
     df["EDUCATION"] = df["EDUCATION"].replace({0: 4, 5: 4, 6: 4})
@@ -109,11 +107,10 @@ def features(df):
     X["amt_over_limit"] = X["amt_sum"] / lim
     X["log_limit"] = np.log1p(lim)
 
-    # Spending decomposition. The data gives balances and payments but never
-    # the amount actually CHARGED, and those are different risk stories: a
-    # balance rising because someone is spending is not the same as one rising
-    # because they stopped paying. The accounting identity recovers it, since
-    # PAY_AMT_t pays down BILL_AMT_(t+1):
+    # Spending decomposition. The raw data has balances and payments but not
+    # the amount actually charged -- a balance rising from new spending is a
+    # different risk story than one rising from missed payments. Recovered
+    # from the accounting identity (PAY_AMT_t pays down BILL_AMT_(t+1)):
     #     spend_t = BILL_t - BILL_(t+1) + PAY_AMT_t   (+ interest/fees)
     bill_m = X[BILL].to_numpy(float)
     amt_m = X[AMT].to_numpy(float)
@@ -127,15 +124,15 @@ def features(df):
     X["spend_trend"] = (spend[:, 0] - spend[:, 4]) / limv
     X["spend_total"] = spend.sum(axis=1) / limv
     X["n_months_no_spend"] = (spend <= 0).sum(axis=1)
+
     # charging more than repaying = debt accumulating under its own momentum
     paid_m = amt_m[:, :5]
     X["spend_minus_paid"] = (spend - paid_m).sum(axis=1) / limv
     X["months_spend_gt_paid"] = (spend > paid_m).sum(axis=1)
 
-    # Minimum-payment behaviour. Issuers here required roughly 10% minimum, and
-    # "pays the minimum and nothing more, every month" is a distress pattern the
-    # payratio features cannot express -- they score that customer as merely
-    # "low ratio", the same as someone who paid an arbitrary small amount.
+    # Minimum-payment behaviour. Issuers required ~10% minimum; "pays exactly
+    # the minimum every month" is a distress signal that payratio alone can't
+    # tell apart from "paid some arbitrary small amount".
     prev_m = bill_m[:, 1:]
     min_due = np.where(prev_m > 0, prev_m * MIN_PAY_RATE, np.nan)
     ratio_m = np.where(np.isnan(min_due) | (min_due == 0), np.nan, paid_m / min_due)
