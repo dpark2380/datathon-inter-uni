@@ -9,7 +9,7 @@ isotonic recalibration helps further, and writes the submitted file:
 Two details needed to reproduce the submitted result:
 
   * LightGBM's component is test_lgbm_full.npy (the pure full-data refit),
-    not the 50/50 fold/refit mix in test_lgbm.npy -- the pure refit scored
+    not the 50/50 fold/refit mix in test_lgbm.npy: the pure refit scored
     0.41032 vs 0.41038 when tested in isolation.
   * rejected/nn_model.py's MLP is deliberately excluded: the weight search
     always drove it to 0.00 once the GRU existed, so it's kept only as a
@@ -38,7 +38,7 @@ def load_predictions():
         test["lgbm"] = np.load(OUT / "test_lgbm_full.npy")
     except FileNotFoundError as e:
         raise SystemExit(
-            f"missing {e.filename} -- run lgbm_model.py, seq_model.py and tabpfn_model.py first"
+            f"missing {e.filename}. Run lgbm_model.py, seq_model.py and tabpfn_model.py first"
         )
     return oof, test
 
@@ -149,7 +149,7 @@ def main():
         f"(-{ensemble_gain:.5f} vs lgbm alone)"
     )
     if ensemble_gain < 0.0005:
-        print("gain is under 0.0005, i.e. inside fold noise -- plain lgbm is the safer pick")
+        print("gain is under 0.0005, i.e. inside fold noise, so plain lgbm is the safer pick")
 
     oof_blend = blend_predictions(oof, best_weights)
     test_blend = blend_predictions(test, best_weights)
@@ -157,8 +157,8 @@ def main():
     # Check whether recalibrating the blend lowers OOF log loss further.
     # Isotonic regression can overfit the exact points it's scored on, so
     # this uses its own nested CV (common.folds) instead of fit-and-score on
-    # the same rows -- otherwise a flexible calibrator always "wins". "none"
-    # stays in the running, so calibration can only help, never hurt.
+    # the same rows, since a flexible calibrator always "wins" that way.
+    # "none" stays in the running, so calibration can only help, never hurt.
     print("\ncalibration check on the blend (cross-validated OOF log loss):")
     candidates = calibration_scores(y, oof_blend, losses[best_weights])
     for name, loss in candidates.items():

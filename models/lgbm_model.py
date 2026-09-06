@@ -12,8 +12,8 @@ from sklearn.metrics import roc_auc_score
 from common import OUT, REPEATS, folds, load, save, score
 
 # Picked by a 5-fold sweep over depth/leaves/regularization. Shallow and
-# heavily regularized wins (0.7891 auc vs 0.7843 for deeper trees) -- the
-# signal here is mostly PAY_* history, and deeper trees just overfit it.
+# heavily regularized wins (0.7891 auc vs 0.7843 for deeper trees), since
+# the signal here is mostly PAY_* history, and deeper trees just overfit it.
 PARAMS = dict(
     objective="binary",
     learning_rate=0.03,

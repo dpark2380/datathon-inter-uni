@@ -183,7 +183,7 @@ def preprocessors(X, seq_all, rows):
     Returns (static, norm): `static` scales + one-hot-encodes a feature frame
     for the head; `norm` standardises a panel tensor per channel. Fitting
     only on `rows` (a training fold during CV, or every row for the full
-    refit) is what keeps validation/test data out of the fit -- one function
+    refit) is what keeps validation/test data out of the fit. One function
     for both cases means that leakage discipline lives in a single place.
     """
     num = [c for c in X.columns if c not in CATS]
@@ -246,8 +246,8 @@ def main():
 
     # Refit on all 24k rows at the average best epoch, then average with the
     # fold ensemble. OOF can't measure this gain (it only sees 80%-data fold
-    # models) but test predictions do, from a model trained on 25% more data
-    # -- same rationale as lgbm_model.py's full refit.
+    # models) but test predictions do, from a model trained on 25% more data,
+    # same rationale as lgbm_model.py's full refit.
     n_epochs = max(1, int(np.mean(epochs_used)))
     print(f"\nfull-data refit at {n_epochs} epochs (avg best epoch across CV)", flush=True)
     static, norm = preprocessors(X, seq_all, np.arange(len(X)))   # fitted on everything
