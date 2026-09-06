@@ -9,7 +9,7 @@ import pandas as pd
 import lightgbm as lgb
 from sklearn.metrics import roc_auc_score
 
-from common import folds, load, save, score
+from common import OUT, REPEATS, folds, load, save, score
 
 # Picked by a 5-fold sweep over depth/leaves/regularization. Shallow and
 # heavily regularized wins: the signal here is mostly the PAY_* history and
@@ -37,24 +37,27 @@ def main():
     oof = np.zeros(len(X))
     test_pred = np.zeros(len(X_test))
     rounds = []
-    splits = list(folds(X, y))
-    n_models = len(splits) * len(SEEDS)
+    n_models = 5 * len(SEEDS) * len(REPEATS)
 
-    for fold, (tr, va) in enumerate(splits, 1):
-        for seed in SEEDS:
-            m = lgb.LGBMClassifier(**PARAMS, random_state=seed)
-            m.fit(
-                X.iloc[tr],
-                y[tr],
-                eval_X=X.iloc[va],
-                eval_y=y[va],
-                eval_metric="auc",
-                callbacks=[lgb.early_stopping(150, verbose=False)],
-            )
-            oof[va] += m.predict_proba(X.iloc[va])[:, 1] / len(SEEDS)
-            test_pred += m.predict_proba(X_test)[:, 1] / n_models
-            rounds.append(m.best_iteration_ or PARAMS["n_estimators"])
-        print(f"fold {fold}  auc {roc_auc_score(y[va], oof[va]):.5f}")
+    for rep in REPEATS:
+        splits = list(folds(X, y, seed=rep))
+        for fold, (tr, va) in enumerate(splits, 1):
+            for seed in SEEDS:
+                m = lgb.LGBMClassifier(**PARAMS, random_state=seed + 100 * rep)
+                m.fit(
+                    X.iloc[tr],
+                    y[tr],
+                    eval_X=X.iloc[va],
+                    eval_y=y[va],
+                    eval_metric="binary_logloss",
+                    callbacks=[lgb.early_stopping(150, verbose=False)],
+                )
+                # each repeat covers every row exactly once, so averaging the
+                # repeats gives each OOF row an equal-weight mean
+                oof[va] += m.predict_proba(X.iloc[va])[:, 1] / (len(SEEDS) * len(REPEATS))
+                test_pred += m.predict_proba(X_test)[:, 1] / n_models
+                rounds.append(m.best_iteration_ or PARAMS["n_estimators"])
+        print(f"repeat {rep}  auc {roc_auc_score(y, oof * len(REPEATS) / (rep + 1)):.5f}")
 
     print()
     score("lgbm OOF", y, oof)
@@ -69,6 +72,12 @@ def main():
         full.fit(X, y)
         full_pred += full.predict_proba(X_test)[:, 1] / len(SEEDS)
     preds = 0.5 * test_pred + 0.5 * full_pred
+
+    # Keep the two components separately so the mixing ratio can be probed
+    # without retraining. The 50/50 above was inherited, never tested; the
+    # refit mechanism itself is confirmed (it gained 0.00023 on the board).
+    np.save(OUT / "test_lgbm_folds.npy", test_pred)
+    np.save(OUT / "test_lgbm_full.npy", full_pred)
 
     save("lgbm", oof, preds, ids)
     print(f"base rate {y.mean():.4f}  mean predicted {preds.mean():.4f}")

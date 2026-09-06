@@ -1,2 +1,9 @@
 .claude/settings.local.json
 .output
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# CatBoost training logs
+catboost_info/

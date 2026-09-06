@@ -1,0 +1,78 @@
+{
+  "topic": "Credit default prediction: modeling, calibration & responsible use",
+  "scope": "full (not fast-pass); broader credit-risk domain per user selection",
+  "date_run": "2026-09-05",
+  "queries": [
+    {
+      "query": "credit card default prediction machine learning",
+      "type": "topic",
+      "sources": "arxiv,s2,dblp",
+      "date_range": "default (last 1y)",
+      "max_results_per_source": 20,
+      "result_count": 38
+    },
+    {
+      "query": "credit scoring gradient boosting",
+      "type": "topic",
+      "sources": "arxiv,s2,dblp",
+      "date_range": "default (last 1y)",
+      "max_results_per_source": 20,
+      "result_count": 20
+    },
+    {
+      "query": "probability calibration binary classification imbalanced",
+      "type": "topic",
+      "sources": "arxiv,s2,dblp",
+      "date_range": "default (last 1y)",
+      "max_results_per_source": 20,
+      "result_count": 20
+    },
+    {
+      "query": "tabular deep learning vs gradient boosted trees",
+      "type": "topic",
+      "sources": "arxiv,s2,dblp",
+      "date_range": "default (last 1y)",
+      "max_results_per_source": 20,
+      "result_count": 20
+    },
+    {
+      "query": "fairness responsible use demographic attributes credit scoring",
+      "type": "topic",
+      "sources": "arxiv,s2,dblp",
+      "date_range": "default (last 1y)",
+      "max_results_per_source": 20,
+      "result_count": 20
+    },
+    {
+      "query": "LightGBM XGBoost gradient boosting decision tree",
+      "type": "seminal",
+      "sources": "arxiv,s2,dblp",
+      "date_range": "2014-01 to present, sorted by citations",
+      "max_results_per_source": 15,
+      "result_count": 15
+    },
+    {
+      "query": "predicting good probabilities supervised learning calibration",
+      "type": "seminal",
+      "sources": "arxiv,s2,dblp",
+      "date_range": "1998-01 to present, sorted by citations",
+      "max_results_per_source": 15,
+      "result_count": 30
+    },
+    {
+      "query": "default of credit card clients data mining",
+      "type": "seminal",
+      "sources": "arxiv,s2,dblp",
+      "date_range": "2007-01 to present, sorted by citations",
+      "max_results_per_source": 15,
+      "result_count": 15
+    }
+  ],
+  "notes": [
+    "Semantic Scholar returned HTTP 429 (rate limited) on several calls; paper_search.py fell back to arXiv/DBLP results in those cases rather than failing the whole query.",
+    "DBLP returned HTTP 503 intermittently; not fatal since arXiv/S2 covered the same queries.",
+    "Total unique papers after cross-query deduplication by normalized title: 165 (see papers_raw.json).",
+    "bibtex_utils.py's `fetch` command errors on import (`ModuleNotFoundError: No module named 'pybtex.latexenc'`) across pybtex 0.21-0.26.1; references.bib was hand-built from paper_search.py's own metadata instead.",
+    "Platt (1999) predates arXiv/S2/DBLP's typical indexing for this kind of paper and did not surface via search; it was added manually to the report/bibtex from established bibliographic knowledge instead. The 'Default of Credit Card Clients' UCI dataset paper (Yeh & Lien, 2009) was considered as a candidate seminal citation but was dropped from the final report and references.bib rather than cited from unverified memory, since it did not surface via search either."
+  ]
+}

@@ -20,6 +20,12 @@ BILL = [f"BILL_AMT{i}" for i in range(1, 7)]
 AMT = [f"PAY_AMT{i}" for i in range(1, 7)]
 CATS = ["SEX", "EDUCATION", "MARRIAGE"]
 SEED = 0
+MIN_PAY_RATE = 0.10
+# Fold-split seeds to repeat CV over. Repeated CV is the one lever the OOF
+# score cannot measure: each OOF row is predicted by its own fold's models
+# only, while every test row is predicted by the average of all of them. The
+# leaderboard confirmed this gap is real (OOF 0.4227 vs actual 0.4126).
+REPEATS = tuple(range(6))
 
 
 def clean(df):
@@ -93,6 +99,43 @@ def features(df):
     X["amt_over_limit"] = X["amt_sum"] / lim
     X["log_limit"] = np.log1p(lim)
 
+    # Spending decomposition. The data gives balances and payments but never
+    # the amount actually CHARGED, and those are different risk stories: a
+    # balance rising because someone is spending is not the same as one rising
+    # because they stopped paying. The accounting identity recovers it, since
+    # PAY_AMT_t pays down BILL_AMT_(t+1):
+    #     spend_t = BILL_t - BILL_(t+1) + PAY_AMT_t   (+ interest/fees)
+    bill_m = X[BILL].to_numpy(float)
+    amt_m = X[AMT].to_numpy(float)
+    spend = bill_m[:, :5] - bill_m[:, 1:] + amt_m[:, :5]
+    limv = lim.to_numpy()
+    for i in range(5):
+        X[f"spend{i + 1}"] = spend[:, i] / limv
+    X["spend_mean"] = spend.mean(axis=1) / limv
+    X["spend_max"] = spend.max(axis=1) / limv
+    X["spend_std"] = spend.std(axis=1) / limv
+    X["spend_trend"] = (spend[:, 0] - spend[:, 4]) / limv
+    X["spend_total"] = spend.sum(axis=1) / limv
+    X["n_months_no_spend"] = (spend <= 0).sum(axis=1)
+    # charging more than repaying = debt accumulating under its own momentum
+    paid_m = amt_m[:, :5]
+    X["spend_minus_paid"] = (spend - paid_m).sum(axis=1) / limv
+    X["months_spend_gt_paid"] = (spend > paid_m).sum(axis=1)
+
+    # Minimum-payment behaviour. Issuers here required roughly 10% minimum, and
+    # "pays the minimum and nothing more, every month" is a distress pattern the
+    # payratio features cannot express -- they score that customer as merely
+    # "low ratio", the same as someone who paid an arbitrary small amount.
+    prev_m = bill_m[:, 1:]
+    min_due = np.where(prev_m > 0, prev_m * MIN_PAY_RATE, np.nan)
+    ratio_m = np.where(np.isnan(min_due) | (min_due == 0), np.nan, paid_m / min_due)
+    with np.errstate(invalid="ignore"):
+        X["min_pay_ratio_mean"] = np.nanmean(ratio_m, axis=1)
+        X["min_pay_ratio_min"] = np.nanmin(np.where(np.isnan(ratio_m), np.inf, ratio_m), axis=1)
+        X["months_paid_about_min"] = np.nansum((ratio_m >= 0.8) & (ratio_m <= 1.5), axis=1)
+        X["months_paid_under_min"] = np.nansum(ratio_m < 0.8, axis=1)
+    X["min_pay_ratio_min"] = X["min_pay_ratio_min"].replace(np.inf, np.nan)
+
     for c in CATS:
         X[c] = X[c].astype("category")
     return X
@@ -107,9 +150,15 @@ def load():
     return X, train[TARGET].to_numpy(), X_test, test[ID]
 
 
-def folds(X, y):
-    """The one CV split both models use, so their OOF vectors line up."""
-    return StratifiedKFold(5, shuffle=True, random_state=SEED).split(X, y)
+def folds(X, y, seed=SEED):
+    """The CV split every model uses, so their OOF vectors line up.
+
+    seed selects which split. Models loop over REPEATS of these so the test
+    predictions average across several different partitions, not just several
+    seeds within one -- varying the partition decorrelates the ensemble more
+    than re-seeding a fixed one does.
+    """
+    return StratifiedKFold(5, shuffle=True, random_state=seed).split(X, y)
 
 
 def score(name, y, p):
