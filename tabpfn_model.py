@@ -21,8 +21,17 @@ from tabpfn import TabPFNClassifier
 
 from common import CATS, REPEATS, folds, load, save, score
 
+import torch
+# Apple GPU is ~7x faster than CPU here (0.89 vs 6.3 min/fold, measured at full
+# size). The original run used CPU on an untested assumption that Metal would
+# not work; it does, with identical predictions.
+DEV = "mps" if torch.backends.mps.is_available() else "cpu"
 REPS = REPEATS[:6]          # 6 partitions; ~16 min each
-N_ESTIMATORS = 4            # TabPFN's own internal ensembling
+N_ESTIMATORS = 4            # TabPFN's own internal ensembling. 8 was tested at
+                            # full 6-repeat CV and came out WORSE (solo 0.42358
+                            # vs 0.42345, blend 0.42138 vs 0.42136) despite
+                            # looking better on a single fold -- fold-level
+                            # signal at this scale is noise.
 
 
 def prep(X):
@@ -47,7 +56,7 @@ def main():
     for rep in REPS:
         for fold, (tr, va) in enumerate(folds(Xz, y, seed=rep), 1):
             clf = TabPFNClassifier(
-                device="cpu",
+                device=DEV,
                 ignore_pretraining_limits=True,
                 n_estimators=N_ESTIMATORS,
                 categorical_features_indices=cat_idx,
@@ -71,7 +80,7 @@ def main():
     REFIT_SEEDS = (0, 1, 2)
     for s_ in REFIT_SEEDS:
         clf = TabPFNClassifier(
-            device="cpu",
+            device=DEV,
             ignore_pretraining_limits=True,
             n_estimators=N_ESTIMATORS,
             categorical_features_indices=cat_idx,
