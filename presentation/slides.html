@@ -202,7 +202,7 @@
       <div class="content" style="justify-content:center; gap:clamp(14px,2.4vw,26px);">
         <span class="label" style="font-family:var(--font-mono); font-size:clamp(9px,1vw,12px); letter-spacing:.1em; color:var(--accent-strong); text-transform:uppercase;">Stream 1 &middot; Credit Card Default</span>
         <h1 style="font-size:clamp(28px,4.6vw,52px); max-width:14ch;">Predicting Default, One Statement Ahead</h1>
-        <p class="lede">A probability of default for 24,000 credit-card customers, scored by binary log loss &mdash; and what three months of experimentation taught us about which signals actually predict it.</p>
+        <p class="lede">A probability of default for 24,000 credit-card customers, scored by binary log loss. Here is what three months of experimentation taught us about which signals actually predict it.</p>
         <div class="row">
           <div class="card" style="flex:1;"><span class="label">Customers</span><span class="stat">24,000</span></div>
           <div class="card" style="flex:1;"><span class="label">Raw columns</span><span class="stat">23</span></div>
@@ -219,14 +219,14 @@
         <span class="statement-eyebrow" style="font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; color:var(--accent-strong); text-transform:uppercase;">Data Understanding &amp; Preparation</span>
         <h1>Clean Data, Undocumented Codes</h1>
         <div class="grid2">
-          <div class="card flag-good"><span class="label">Missing values</span><span class="stat good">0</span><p>Across all 24,000 rows and 23 columns &mdash; confirmed by direct null count, not assumed.</p></div>
-          <div class="card"><span class="label">Rows carrying stray codes</span><span class="stat accent">332</span><p>Found by printing per-column unique values &mdash; not documented anywhere in the data dictionary.</p></div>
+          <div class="card flag-good"><span class="label">Missing values</span><span class="stat good">0</span><p>Across all 24,000 rows and 23 columns, confirmed by direct null count, not assumed.</p></div>
+          <div class="card"><span class="label">Rows carrying stray codes</span><span class="stat accent">332</span><p>Found by printing per-column unique values. Not documented anywhere in the data dictionary.</p></div>
         </div>
         <ul class="taglist">
           <li><span>EDUCATION codes 0, 5, 6 &rarr; 4 (&ldquo;other&rdquo;)</span><span class="v">290 rows</span></li>
           <li><span>MARRIAGE code 0 &rarr; 3 (&ldquo;other&rdquo;)</span><span class="v">42 rows</span></li>
         </ul>
-        <div class="formula" style="font-size:clamp(11px,1.4vw,15px);">PAY_-2 = no balance &nbsp;&middot;&nbsp; PAY_-1 = paid in full &mdash; informative states, kept as features, never imputed.</div>
+        <div class="formula" style="font-size:clamp(11px,1.4vw,15px);">PAY_-2 = no balance &nbsp;&middot;&nbsp; PAY_-1 = paid in full. Both are informative states, kept as features, never imputed.</div>
       </div>
     </section>
 
@@ -236,13 +236,13 @@
       <div class="content">
         <span class="statement-eyebrow" style="font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; color:var(--accent-strong); text-transform:uppercase;">Methodology &amp; Experimentation</span>
         <h1>Recovering the Number the Data Never States</h1>
-        <p class="lede">The columns give statement balances and payments &mdash; never the amount actually charged. It is recoverable exactly, from the identity that governs a revolving account:</p>
+        <p class="lede">The columns give statement balances and payments, never the amount actually charged. It is recoverable exactly, from the identity that governs a revolving account:</p>
         <div class="formula">spend ₜ&nbsp; = &nbsp;BILL ₜ&nbsp; &minus; &nbsp;BILL ₜ₊₁&nbsp; + &nbsp;PAY_AMT ₜ</div>
         <div class="grid2">
           <div class="card flag-good">
             <span class="label">Hidden-test gain</span>
             <span class="stat good">&minus;0.00173</span>
-            <p>The single largest move of the entire project &mdash; separating &ldquo;spending more&rdquo; from &ldquo;stopped paying&rdquo; when a balance rises.</p>
+            <p>The single largest move of the entire project, separating &ldquo;spending more&rdquo; from &ldquo;stopped paying&rdquo; when a balance rises.</p>
           </div>
           <div class="card">
             <span class="label">Six other feature families tried</span>
@@ -280,7 +280,7 @@
         </svg>
         <div class="card" style="border-left:3px solid var(--bad);">
           <span class="label">A result worth reporting honestly</span>
-          <p>Isotonic calibration looked like the biggest win on record &mdash; it was fitted and scored on the same out-of-fold rows. Under proper nested cross-validation it became the <strong style="color:var(--bad);">single worst result</strong> in the table (&minus;0.00330). Caught mid-project; every fitted step after it was scored strictly out-of-fold.</p>
+          <p>Isotonic calibration looked like the biggest win on record. It was fitted and scored on the same out-of-fold rows. Under proper nested cross-validation it became the <strong style="color:var(--bad);">single worst result</strong> in the table (&minus;0.00330). Caught mid-project, and every fitted step after it was scored strictly out-of-fold.</p>
         </div>
       </div>
     </section>
@@ -296,17 +296,57 @@
           <div class="card">
             <span class="label">LightGBM &middot; gradient-boosted trees</span>
             <span class="stat">62.7%</span>
-            <p>Starts at the 22.1% base rate. ~352 shallow trees each nudge it by a yes/no split &mdash; the first, &ldquo;recent_late &gt; 0.75?&rdquo;, alone routes 2,536 customers to the riskiest leaf.</p>
+            <svg viewBox="0 0 200 72" style="width:100%; height:56px;" role="img" aria-label="Hundreds of shallow decision trees; one shown splitting on recent lateness to the riskiest leaf">
+              <rect x="10" y="4" width="150" height="36" rx="4" fill="none" stroke="var(--line)"/>
+              <rect x="6" y="8" width="150" height="36" rx="4" fill="none" stroke="var(--line)"/>
+              <rect x="2" y="12" width="150" height="36" rx="4" fill="var(--surface-2)" stroke="var(--ink-faint)"/>
+              <circle cx="22" cy="30" r="4" fill="var(--ink-soft)"/>
+              <line x1="26" y1="28" x2="52" y2="18" stroke="var(--ink-faint)" stroke-width="1.5"/>
+              <line x1="26" y1="30" x2="52" y2="40" stroke="var(--ink-faint)" stroke-width="1.5"/>
+              <circle cx="55" cy="18" r="3" fill="var(--good)"/>
+              <circle cx="55" cy="40" r="4" fill="var(--bad)"/>
+              <text x="63" y="21" font-size="7">safe branch</text>
+              <text x="63" y="43" font-size="7" style="fill:var(--bad);">riskiest leaf</text>
+            </svg>
+            <p style="font-size:clamp(9px,1vw,11px);">About 352 trees per fold, split on recency of lateness. One shown.</p>
           </div>
           <div class="card">
             <span class="label">GRU &middot; ordered 6-month memory</span>
             <span class="stat">34.3%</span>
-            <p>Reads month-by-month, updating 32 memory values forwards and backwards &mdash; separates a customer who is <em>recovering</em> from one who is <em>deteriorating</em>, even with identical lateness counts.</p>
+            <svg viewBox="0 0 200 60" style="width:100%; height:56px;" role="img" aria-label="Six monthly values read in order, updating a running memory state">
+              <g fill="var(--surface-2)" stroke="var(--line)">
+                <rect x="2" y="20" width="16" height="16" rx="2"/><rect x="24" y="20" width="16" height="16" rx="2"/>
+                <rect x="46" y="20" width="16" height="16" rx="2"/><rect x="68" y="20" width="16" height="16" rx="2"/>
+                <rect x="90" y="20" width="16" height="16" rx="2"/><rect x="112" y="20" width="16" height="16" rx="2"/>
+              </g>
+              <line x1="18" y1="28" x2="24" y2="28" stroke="var(--ink-faint)"/><line x1="40" y1="28" x2="46" y2="28" stroke="var(--ink-faint)"/>
+              <line x1="62" y1="28" x2="68" y2="28" stroke="var(--ink-faint)"/><line x1="84" y1="28" x2="90" y2="28" stroke="var(--ink-faint)"/>
+              <line x1="106" y1="28" x2="112" y2="28" stroke="var(--ink-faint)"/>
+              <line x1="128" y1="28" x2="150" y2="28" stroke="var(--accent)" stroke-width="1.5"/>
+              <circle cx="164" cy="28" r="11" fill="var(--accent)" opacity="0.85"/>
+              <text x="4" y="14" font-size="7">M6</text>
+              <text x="112" y="14" font-size="7">M1</text>
+              <text x="164" y="50" font-size="7" text-anchor="middle">memory</text>
+            </svg>
+            <p style="font-size:clamp(9px,1vw,11px);">Tells apart a customer who is recovering from one who is deteriorating.</p>
           </div>
           <div class="card">
             <span class="label">TabPFN &middot; pretrained, zero fitting</span>
             <span class="stat">31.2%</span>
-            <p>Shown 19,200 labelled customers as live context and returns a probability in one forward pass &mdash; its parameters never change, and it never sees our data during training.</p>
+            <svg viewBox="0 0 200 60" style="width:100%; height:56px;" role="img" aria-label="Many labelled context rows feeding a single forward pass to one output"><g fill="var(--ink-faint)">
+              <circle cx="8" cy="12" r="3"/><circle cx="24" cy="6" r="3"/><circle cx="38" cy="18" r="3"/><circle cx="12" cy="30" r="3"/>
+              <circle cx="30" cy="34" r="3"/><circle cx="8" cy="46" r="3"/><circle cx="26" cy="50" r="3"/><circle cx="40" cy="40" r="3"/>
+              </g>
+              <g stroke="var(--line)" stroke-width="1">
+                <line x1="8" y1="12" x2="90" y2="28"/><line x1="24" y1="6" x2="90" y2="28"/><line x1="38" y1="18" x2="90" y2="28"/><line x1="12" y1="30" x2="90" y2="28"/>
+                <line x1="30" y1="34" x2="90" y2="28"/><line x1="8" y1="46" x2="90" y2="28"/><line x1="26" y1="50" x2="90" y2="28"/><line x1="40" y1="40" x2="90" y2="28"/>
+              </g>
+              <line x1="90" y1="28" x2="150" y2="28" stroke="var(--accent)" stroke-width="1.5"/>
+              <circle cx="164" cy="28" r="11" fill="var(--accent)" opacity="0.85"/>
+              <text x="4" y="59" font-size="7">19,200 context rows</text>
+              <text x="164" y="50" font-size="7" text-anchor="middle">one pass</text>
+            </svg>
+            <p style="font-size:clamp(9px,1vw,11px);">Parameters never change; it never trains on our data.</p>
           </div>
         </div>
         <div class="formula" style="display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;">
@@ -322,13 +362,46 @@
       <div class="content">
         <span class="statement-eyebrow" style="font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; color:var(--accent-strong); text-transform:uppercase;">Model Selection &amp; Validation</span>
         <h1>Three Ways of Reading the Same Customer</h1>
-        <div class="grid3">
-          <div class="card"><span class="label">LightGBM &middot; weight 0.45</span><span class="stat">flat statistics</span><p>81 engineered features as one snapshot. OOF 0.42211.</p></div>
-          <div class="card"><span class="label">GRU &middot; weight 0.30</span><span class="stat">ordered trajectory</span><p>Reads the same customer as 6 months in sequence. OOF 0.42392.</p></div>
-          <div class="card"><span class="label">TabPFN &middot; weight 0.25</span><span class="stat">pretrained prior</span><p>In-context learning, zero parameters fit. OOF 0.42345.</p></div>
-        </div>
+        <svg viewBox="0 0 1000 220" style="width:100%; height:clamp(150px,20vw,200px);" role="img" aria-label="Pipeline: raw data through cleaning and feature engineering into three named models, LightGBM at 45 percent, GRU at 30 percent and TabPFN at 25 percent, blended and clipped into the final prediction of 0.40982">
+          <g fill="none" stroke="var(--line)">
+            <rect x="0" y="90" width="110" height="40" rx="5"/>
+            <rect x="140" y="90" width="90" height="40" rx="5"/>
+            <rect x="260" y="90" width="110" height="40" rx="5"/>
+          </g>
+          <text x="55" y="106" text-anchor="middle" font-size="10" class="value-label">RAW DATA</text>
+          <text x="55" y="120" text-anchor="middle" font-size="8">24,000 &times; 23</text>
+          <text x="185" y="114" text-anchor="middle" font-size="10" class="value-label">CLEAN</text>
+          <text x="315" y="114" text-anchor="middle" font-size="10" class="value-label">81 FEATURES</text>
+          <g stroke="var(--ink-faint)" stroke-width="1.5">
+            <line x1="110" y1="110" x2="140" y2="110"/><line x1="230" y1="110" x2="260" y2="110"/>
+          </g>
+          <g stroke="var(--ink-faint)" stroke-width="1.2">
+            <line x1="370" y1="110" x2="420" y2="30"/><line x1="370" y1="110" x2="420" y2="110"/><line x1="370" y1="110" x2="420" y2="190"/>
+          </g>
+          <rect x="420" y="10" width="160" height="40" rx="5" fill="var(--surface-2)" stroke="var(--accent)"/>
+          <text x="500" y="30" text-anchor="middle" font-size="11" class="accent-label">LIGHTGBM &middot; 45%</text>
+          <text x="500" y="44" text-anchor="middle" font-size="8">OOF 0.42211</text>
+          <rect x="420" y="90" width="160" height="40" rx="5" fill="var(--surface-2)" stroke="var(--accent)"/>
+          <text x="500" y="110" text-anchor="middle" font-size="11" class="accent-label">GRU &middot; 30%</text>
+          <text x="500" y="124" text-anchor="middle" font-size="8">OOF 0.42392</text>
+          <rect x="420" y="170" width="160" height="40" rx="5" fill="var(--surface-2)" stroke="var(--accent)"/>
+          <text x="500" y="190" text-anchor="middle" font-size="11" class="accent-label">TABPFN &middot; 25%</text>
+          <text x="500" y="204" text-anchor="middle" font-size="8">OOF 0.42345</text>
+          <g stroke="var(--ink-faint)" stroke-width="1.2">
+            <line x1="580" y1="30" x2="650" y2="110"/><line x1="580" y1="110" x2="650" y2="110"/><line x1="580" y1="190" x2="650" y2="110"/>
+          </g>
+          <rect x="650" y="90" width="90" height="40" rx="5" fill="none" stroke="var(--line)"/>
+          <text x="695" y="114" text-anchor="middle" font-size="10" class="value-label">BLEND</text>
+          <line x1="740" y1="110" x2="770" y2="110" stroke="var(--ink-faint)" stroke-width="1.5"/>
+          <rect x="770" y="90" width="70" height="40" rx="5" fill="none" stroke="var(--line)"/>
+          <text x="805" y="114" text-anchor="middle" font-size="10" class="value-label">CLIP</text>
+          <line x1="840" y1="110" x2="868" y2="110" stroke="var(--ink-faint)" stroke-width="1.5"/>
+          <rect x="868" y="78" width="130" height="64" rx="6" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="933" y="102" text-anchor="middle" font-size="10">PREDICTION</text>
+          <text x="933" y="124" text-anchor="middle" font-size="16" class="accent-label">0.40982</text>
+        </svg>
         <div class="row">
-          <div class="card" style="flex:1;"><span class="label">Validation</span><span class="stat" style="font-size:clamp(13px,1.6vw,18px);">Stratified 5-fold &times; 6 partitions</span><p>Noise floor 0.0005 &mdash; nothing adopted below it.</p></div>
+          <div class="card" style="flex:1;"><span class="label">Validation</span><span class="stat" style="font-size:clamp(13px,1.6vw,18px);">Stratified 5-fold &times; 6 partitions</span><p>Noise floor 0.0005. Nothing adopted below it.</p></div>
           <div class="card" style="flex:1;"><span class="label">Out-of-fold &rarr; hidden test</span><span class="stat accent">0.42136 &rarr; 0.40982</span></div>
         </div>
       </div>
@@ -378,8 +451,8 @@
             </svg>
           </div>
           <div style="display:flex; flex-direction:column; gap:10px;">
-            <div class="card flag-bad"><span class="label">EDUCATION = &ldquo;other&rdquo;</span><span class="stat bad">1.61&times;</span><p>Actual default rate 7.24% vs. predicted 11.62% &mdash; over-predicted 61% relative. Traced to the cleaning collapse (§1.2).</p></div>
-            <div class="card"><span class="label">20 worst-predicted customers</span><span class="stat accent">2&ndash;4% risk</span><p>All were actual defaulters with a spotless payment history. Not recoverable from these columns.</p></div>
+            <div class="card flag-bad"><span class="label">EDUCATION = &ldquo;other&rdquo;</span><span class="stat bad">1.61&times;</span><p>Actual default rate 7.24% vs. predicted 11.62%: over-predicted 61% relative. Traced to the cleaning collapse (§1.2).</p></div>
+            <div class="card"><span class="label">20 worst-predicted customers</span><span class="stat accent">2-4% risk</span><p>All were actual defaulters with a spotless payment history. Not recoverable from these columns.</p></div>
           </div>
         </div>
       </div>
@@ -392,7 +465,7 @@
         <span class="statement-eyebrow" style="font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; color:var(--accent-strong); text-transform:uppercase;">Real-World Application</span>
         <h1>A Three-Tier Decision, Not One Cutoff</h1>
         <div class="grid2">
-          <div class="card flag-bad"><span class="label">False negative</span><span class="stat">bad debt extended</span><p>A defaulter approved at low predicted risk &mdash; direct dollar loss on the account.</p></div>
+          <div class="card flag-bad"><span class="label">False negative</span><span class="stat">bad debt extended</span><p>A defaulter approved at low predicted risk: a direct dollar loss on the account.</p></div>
           <div class="card"><span class="label">False positive</span><span class="stat">good customer declined</span><p>Revenue foregone, plus a fairness cost sharpened by the &ldquo;other&rdquo; miscalibration above.</p></div>
         </div>
         <div>
@@ -402,7 +475,7 @@
             <div style="flex:0.22; background:var(--bad);">AUTO-DECLINE</div>
           </div>
         </div>
-        <p class="lede">EDUCATION=&ldquo;other&rdquo; customers route to human review, never auto-decline &mdash; the one segment where the model is least trustworthy.</p>
+        <p class="lede">EDUCATION=&ldquo;other&rdquo; customers route to human review, never auto-decline. It is the one segment where the model is least trustworthy.</p>
       </div>
     </section>
 
@@ -421,7 +494,7 @@
           <li><span>Blend weights are the one step that could overfit</span><span class="v">mitigated, not eliminated</span></li>
           <li><span>Some defaults are structurally unpredictable here</span><span class="v">see slide 07</span></li>
         </ul>
-        <p class="closing">A better result needs a new insight about the data &mdash; not more tuning.</p>
+        <p class="closing">A better result needs a new insight about the data, not more tuning.</p>
       </div>
     </section>
 
