@@ -78,7 +78,7 @@ uv run python -c "import sys, pandas as pd; sys.path.insert(0, 'models'); \
 from common import clean; clean(pd.read_csv('datasets/train.csv')).to_csv('datasets/train_clean.csv', index=False)"
 ```
 
-(`2_Data_Cleaning.ipynb` is where we worked out *which* substitutions were needed — it
+(`2_Column_Inspection.ipynb` is where we worked out *which* substitutions were needed — it
 prints the unique values and null counts per column. The substitutions themselves live
 in `common.clean()` so that train and test are treated identically.)
 

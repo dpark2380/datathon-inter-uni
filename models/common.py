@@ -29,7 +29,17 @@ REPEATS = tuple(range(6))
 
 
 def clean(df):
-    """Same code collapsing as Data Cleaning.ipynb: unknown codes -> 'other'."""
+    """Collapse the undocumented category codes onto 'other'.
+
+    EDUCATION {0, 5, 6} -> 4 and MARRIAGE {0} -> 3. The data dictionary defines
+    1-4 and 1-3 respectively; the extra codes cover a small tail and behave like
+    'other'. 2_Column_Inspection.ipynb is where they were found, not where they
+    are fixed -- this function is the only implementation, so train and test are
+    treated identically.
+
+    Idempotent, so it is safe to call on datasets/train_clean.csv, which already
+    has it applied.
+    """
     df = df.copy()
     df["EDUCATION"] = df["EDUCATION"].replace({0: 4, 5: 4, 6: 4})
     df["MARRIAGE"] = df["MARRIAGE"].replace({0: 3})

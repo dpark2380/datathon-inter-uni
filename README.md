@@ -82,7 +82,7 @@ the fold ensemble for the test predictions.
 | # | File | Role |
 |---|---|---|
 | 1 | `1_EDA.ipynb` | Exploratory analysis — distributions, the target base rate, how each raw column behaves |
-| 2 | `2_Data_Cleaning.ipynb` | Column-level inspection (unique values, null counts) that identified the undocumented category codes |
+| 2 | `2_Column_Inspection.ipynb` | Column-level inspection (unique values, null counts) that identified the undocumented category codes |
 | 3 | `models/common.py` | The spine: `clean()`, `features()` (81 features), `load()`, `folds()`, `score()`, `save()`. Every script below calls it |
 | 4 | `models/lgbm_model.py` | LightGBM — 90 fold fits + 3-seed full-data refit |
 | 5 | `models/seq_model.py` | Bidirectional GRU over the 6 × 8 monthly panel — 150 fits + refit |
