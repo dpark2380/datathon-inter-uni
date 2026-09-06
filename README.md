@@ -132,8 +132,6 @@ needs to be run before step 3.
   the AMEX Default Prediction competition. Five techniques were tested from them which are DART boosting, `min_data_in_leaf`, `feature_fraction_bynode`,
   recency-window aggregates, within-customer ranks. **None were used in the final submission** as they all measured worse under cross-validation.
 
-<<<<<<< HEAD
-=======
 ## Known limitations
 
 - `EDUCATION="other"` (387 customers, 28 defaults) is over-predicted by ~61%
@@ -176,4 +174,3 @@ needs to be run before step 3.
                                         │                                                             
                                         ▼  Step 8: Governance, SHAP & Fairness                        
                           (models/interpret.py & models/fairness_audit.py)  
->>>>>>> e609fda7bc19b52e15108064cc7d25fc44ab33b7
