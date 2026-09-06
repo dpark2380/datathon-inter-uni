@@ -290,6 +290,37 @@
       <div class="spine"><span class="n">05</span><span class="tick"></span></div>
       <div class="content">
         <span class="statement-eyebrow" style="font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; color:var(--accent-strong); text-transform:uppercase;">Model Selection &amp; Validation</span>
+        <h1>Three Mechanisms, One Customer</h1>
+        <p class="lede">One real validation customer: late the last two months, 100% credit utilisation, paid under 5% of a recent bill. Here is exactly how each component scores them.</p>
+        <div class="grid3">
+          <div class="card">
+            <span class="label">LightGBM &middot; gradient-boosted trees</span>
+            <span class="stat">62.7%</span>
+            <p>Starts at the 22.1% base rate. ~352 shallow trees each nudge it by a yes/no split &mdash; the first, &ldquo;recent_late &gt; 0.75?&rdquo;, alone routes 2,536 customers to the riskiest leaf.</p>
+          </div>
+          <div class="card">
+            <span class="label">GRU &middot; ordered 6-month memory</span>
+            <span class="stat">34.3%</span>
+            <p>Reads month-by-month, updating 32 memory values forwards and backwards &mdash; separates a customer who is <em>recovering</em> from one who is <em>deteriorating</em>, even with identical lateness counts.</p>
+          </div>
+          <div class="card">
+            <span class="label">TabPFN &middot; pretrained, zero fitting</span>
+            <span class="stat">31.2%</span>
+            <p>Shown 19,200 labelled customers as live context and returns a probability in one forward pass &mdash; its parameters never change, and it never sees our data during training.</p>
+          </div>
+        </div>
+        <div class="formula" style="display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;">
+          <span>0.45&times;62.7 + 0.30&times;34.3 + 0.25&times;31.2 = <strong style="color:var(--accent-strong);">46.3%</strong> predicted</span>
+          <span style="color:var(--bad); font-weight:600;">actual outcome: defaulted</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section class="slide" data-n="6" hidden>
+      <div class="spine"><span class="n">06</span><span class="tick"></span></div>
+      <div class="content">
+        <span class="statement-eyebrow" style="font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; color:var(--accent-strong); text-transform:uppercase;">Model Selection &amp; Validation</span>
         <h1>Three Ways of Reading the Same Customer</h1>
         <div class="grid3">
           <div class="card"><span class="label">LightGBM &middot; weight 0.45</span><span class="stat">flat statistics</span><p>81 engineered features as one snapshot. OOF 0.42211.</p></div>
@@ -303,9 +334,9 @@
       </div>
     </section>
 
-    <!-- 6 -->
-    <section class="slide" data-n="6" hidden>
-      <div class="spine"><span class="n">06</span><span class="tick"></span></div>
+    <!-- 7 -->
+    <section class="slide" data-n="7" hidden>
+      <div class="spine"><span class="n">07</span><span class="tick"></span></div>
       <div class="content">
         <span class="statement-eyebrow" style="font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; color:var(--accent-strong); text-transform:uppercase;">Insights &amp; Interpretation</span>
         <h1>Recency of Lateness, Not Raw Balance</h1>
@@ -319,9 +350,9 @@
       </div>
     </section>
 
-    <!-- 7 -->
-    <section class="slide" data-n="7" hidden>
-      <div class="spine"><span class="n">07</span><span class="tick"></span></div>
+    <!-- 8 -->
+    <section class="slide" data-n="8" hidden>
+      <div class="spine"><span class="n">08</span><span class="tick"></span></div>
       <div class="content">
         <span class="statement-eyebrow" style="font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; color:var(--accent-strong); text-transform:uppercase;">Insights &amp; Limitations</span>
         <h1>Two Honest Failure Modes</h1>
@@ -354,9 +385,9 @@
       </div>
     </section>
 
-    <!-- 8 -->
-    <section class="slide" data-n="8" hidden>
-      <div class="spine"><span class="n">08</span><span class="tick"></span></div>
+    <!-- 9 -->
+    <section class="slide" data-n="9" hidden>
+      <div class="spine"><span class="n">09</span><span class="tick"></span></div>
       <div class="content">
         <span class="statement-eyebrow" style="font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; color:var(--accent-strong); text-transform:uppercase;">Real-World Application</span>
         <h1>A Three-Tier Decision, Not One Cutoff</h1>
@@ -375,9 +406,9 @@
       </div>
     </section>
 
-    <!-- 9 -->
-    <section class="slide" data-n="9" hidden>
-      <div class="spine"><span class="n">09</span><span class="tick"></span></div>
+    <!-- 10 -->
+    <section class="slide" data-n="10" hidden>
+      <div class="spine"><span class="n">10</span><span class="tick"></span></div>
       <div class="content">
         <span class="statement-eyebrow" style="font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; color:var(--accent-strong); text-transform:uppercase;">Limitations &amp; Technical Understanding</span>
         <h1>The Levers We Can Name Are Exhausted</h1>

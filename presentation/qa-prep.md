@@ -21,6 +21,10 @@ A three-tier policy, not a single cutoff: auto-approve the low-risk majority, au
 
 ## Generic methodology questions likely to come up
 
+**Q: Can you walk us through how a prediction actually gets made?**
+Yes — concretely, for one real validation customer (late the last two months, 100% utilization, paid under 5% of a recent bill): **LightGBM** starts at the 22.1% base rate in log-odds and adds ~352 shallow-tree corrections in sequence (its first split is always some version of "were they recently late?") to reach 62.7%. **The GRU** processes the same six months in order, updating a 32-value memory forward and backward, and reaches 34.3% — it can tell a recovering customer from a deteriorating one even when their aggregate stats (like total late months) are identical, which LightGBM's flat feature row cannot. **TabPFN** is shown 19,200 labelled customers as live context and returns 31.2% in a single forward pass, with no parameters fit to our data at all — it's applying a prior learned from pretraining on millions of synthetic datasets. Blended (0.45/0.30/0.25): 46.3%. That customer defaulted.
+*Source: `docs/methodology-report.html` Appendix A (step-by-step worked example); REPORT.md §1.6 for the blend arithmetic.*
+
 **Q: Why log loss instead of AUC or accuracy?**
 Log loss was the competition's actual scoring metric, and it rewards *calibration* (how close the predicted probability is to the true rate), not just ranking. We caught this early and switched model selection and blend weighting from AUC to log loss mid-project — the two metrics don't always agree (LightGBM's incumbent hyperparameters were originally tuned against AUC and were never beaten on log loss by 135 later configs).
 *Source: REPORT.md §1.1, §1.5.*
