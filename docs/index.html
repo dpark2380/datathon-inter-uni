@@ -22,10 +22,10 @@
 
   <p class="grp">Overview</p>
   <ol>
-    <li><a class="item" href="#result"><span class="no">·</span>The result</a></li>
-    <li><a class="item" href="#reading"><span class="no">·</span>What is here</a></li>
+    <li><a class="item" href="#result"><span class="no">·</span>Results</a></li>
+    <li><a class="item" href="#reading"><span class="no">·</span>Report contents</a></li>
     <li><a class="item" href="#disclosure"><span class="no">·</span>Disclosure</a></li>
-    <li><a class="item" href="#repro"><span class="no">·</span>Reproducing it</a></li>
+    <li><a class="item" href="#repro"><span class="no">·</span>Reproduction</a></li>
   </ol>
 
   <p class="grp">Methodology report</p>
@@ -37,14 +37,14 @@
     <li><a class="item" href="methodology-report.html#models"><span class="no">5</span>Models tested &amp; selection</a></li>
     <li><a class="item" href="methodology-report.html#ensembling"><span class="no">6</span>Ensembling &amp; post-processing</a></li>
     <li><a class="item" href="methodology-report.html#results"><span class="no">7</span>Results &amp; limitations</a></li>
-    <li><a class="item" href="methodology-report.html#appendix"><span class="no">A</span>How a prediction is computed</a></li>
+    <li><a class="item" href="methodology-report.html#appendix"><span class="no">A</span>Example prediction</a></li>
   </ol>
 
   <p class="grp">Experiment ledger</p>
   <ol>
-    <li><a class="item" href="experiment-ledger.html#survived"><span class="no">1</span>The changes that survived</a></li>
-    <li><a class="item" href="experiment-ledger.html#ledger"><span class="no">2</span>All 41 experiments</a></li>
-    <li><a class="item" href="experiment-ledger.html#patterns"><span class="no">3</span>What the record shows</a></li>
+    <li><a class="item" href="experiment-ledger.html#survived"><span class="no">1</span>Submission sequence</a></li>
+    <li><a class="item" href="experiment-ledger.html#ledger"><span class="no">2</span>All experiments</a></li>
+    <li><a class="item" href="experiment-ledger.html#patterns"><span class="no">3</span>Findings</a></li>
   </ol>
 
   <p class="foot">Source<br><a href="https://github.com/dpark2380/datathon-inter-uni">github.com/dpark2380/<wbr>datathon-inter-uni</a></p>
@@ -55,13 +55,13 @@
 
 <header class="top">
   <p class="kicker">Credit default prediction · submission documents</p>
-  <h1>How the model works, and everything we tried to get there</h1>
-  <p class="sub measure">A weighted average of three models that read the same customers in three different ways. Each earned its place by measurement; thirty-seven other candidates did not.</p>
+  <h1>Model methodology and experiment results</h1>
+  <p class="sub measure">The final prediction is a weighted average of three models, each using a different view of the same customer data. This site explains the methodology and records all 41 experiments.</p>
 </header>
 
 <section id="result">
-  <div class="sechead"><h2>The result</h2></div>
-  <p class="lede measure">The submitted model is a plain weighted average of three probabilities. No meta-model, no calibration, no post-processing beyond clipping. Its accounts read as follows.</p>
+  <div class="sechead"><h2>Results</h2></div>
+  <p class="lede measure">The submitted model combines three probabilities using a fixed weighted average. It does not use a meta-model or calibration, and the only post-processing is probability clipping.</p>
 
   <div class="stmt">
     <table>
@@ -85,28 +85,28 @@
     </table>
   </div>
 
-  <p class="note measure"><strong>Read the total honestly.</strong> The blend averages probabilities, not scores &mdash; you cannot arrive at 0.42136 by weighting the three numbers above. The averaging happens per customer, then the loss is measured once.</p>
+  <p class="note measure"><strong>How to read the blended score.</strong> The model averages each customer&rsquo;s predicted probabilities, then calculates log loss on the combined predictions. For this reason, weighting the three individual scores above will not produce 0.42136.</p>
 
-  <p class="measure">Three models, ten families tried. Eighty-one features, seven families tried. Two hundred and eighty-one fitted models stand behind each prediction: 270 cross-validated fold fits across six fold partitions, plus 11 refits on all 24,000 rows.</p>
+  <p class="measure">The final ensemble contains three of the ten model families tested and uses 81 engineered features organised into six families. Seven candidate feature additions were also tested, of which one was retained. Each prediction combines 281 fitted models: 270 cross-validated fold fits across six fold partitions and 11 refits on all 24,000 rows.</p>
 </section>
 
 <section id="reading">
-  <div class="sechead"><h2>What is here</h2></div>
-  <p class="lede measure">Two documents. The first answers &ldquo;what is this model and why&rdquo;; the second answers &ldquo;what else did you try&rdquo;.</p>
+  <div class="sechead"><h2>Report contents</h2></div>
+  <p class="lede measure">The methodology report explains the final model and the reasons for each design choice. The experiment ledger records the alternatives that were tested.</p>
 
   <div class="docs">
     <a class="doc" href="methodology-report.html">
       <span class="no">01</span>
       <span>
         <h3>Methodology report</h3>
-        <p>Seven sections following the required structure: approach, cleaning, feature engineering, validation, model selection, ensembling, and results with limitations. An appendix traces one real customer through the real model.</p>
+        <p>Seven sections cover the approach, data cleaning, feature engineering, validation, model selection, ensembling, results and limitations. The appendix follows one customer through each component of the final model.</p>
       </span>
     </a>
     <a class="doc" href="experiment-ledger.html">
       <span class="no">02</span>
       <span>
         <h3>Experiment ledger</h3>
-        <p>All 41 experiments with measured deltas against the 0.0005 fold-noise threshold, and why each one did or did not work. Four helped. The other thirty-seven are the more useful half of the record.</p>
+        <p>All 41 experiments are reported against the 0.0005 fold-noise threshold, with the result and interpretation of each test. Four produced gains that were retained.</p>
       </span>
     </a>
   </div>
@@ -115,17 +115,17 @@
 <section id="disclosure">
   <div class="sechead"><h2>Disclosure</h2></div>
   <ul class="deflist measure">
-    <li><b>Pretrained model used</b>TabPFN (Prior Labs), via the <code>tabpfn</code> package. Requires a licence and API token; performs in-context learning and fits no parameters to this dataset.</li>
-    <li><b>AI coding agent used</b>Claude Code, throughout.</li>
-    <li><b>External solutions consulted</b>The 1st, 2nd and 3rd place write-ups from the AMEX Default Prediction competition. Five techniques were tested from them &mdash; DART boosting, high <code>min_data_in_leaf</code>, <code>feature_fraction_bynode</code>, recency-window aggregates, within-customer ranks. None were adopted; all measured worse on cross-validation. The numbers are in <a href="experiment-ledger.html#ledger">the ledger</a>.</li>
+    <li><b>Pretrained model used</b>TabPFN (Prior Labs), accessed through the <code>tabpfn</code> package. It requires a licence and API token, performs in-context learning and fits no parameters to this dataset.</li>
+    <li><b>AI coding agent used</b>Claude Code was used throughout the project.</li>
+    <li><b>External solutions consulted</b>The first-, second- and third-place reports from the AMEX Default Prediction competition. Five techniques were tested: DART boosting, high <code>min_data_in_leaf</code>, <code>feature_fraction_bynode</code>, recency-window aggregates and within-customer ranks. None improved cross-validation and none were adopted. Detailed results are available in <a href="experiment-ledger.html#ledger">the experiment ledger</a>.</li>
     <li><b>External datasets used</b>None. Only the competition-provided files.</li>
     <li><b>Manual modification of predictions</b>None beyond clipping to [1e-4, 1&minus;1e-4].</li>
   </ul>
 </section>
 
 <section id="repro">
-  <div class="sechead"><h2>Reproducing it</h2></div>
-  <p class="measure">Saved prediction vectors and per-component reproduction instructions are in <code>artifacts/</code>. The submitted file is <code>submissions/submission_tabpfn6.csv</code>. A full retrain is several hours, dominated by 150 GRU fits and TabPFN&rsquo;s context-length scaling.</p>
+  <div class="sechead"><h2>Reproduction</h2></div>
+  <p class="measure">Saved prediction vectors and instructions for reproducing each component are in <code>artifacts/</code>. The submitted file is <code>submissions/submission_tabpfn6.csv</code>. A full retraining run takes several hours, primarily because of the 150 GRU fits and TabPFN&rsquo;s context-length scaling.</p>
 </section>
 
 <footer class="doc-foot">
