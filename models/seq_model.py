@@ -1,18 +1,18 @@
 """GRU sequence model over the 6-month repayment panel.
 
-Everything else in this repo flattens the monthly history into summary
-statistics (pay_max, max_late_streak, util_trend...). Those summaries are lossy:
-they throw away the *order* of events. This model reads the panel as an actual
-time series -- 6 timesteps x 8 channels, oldest month first -- so a GRU can pick
-up trajectories the aggregates destroy (e.g. "recovering after a bad patch" vs
-"deteriorating" can share the same mean/max/streak).
+Everything else flattens the monthly history into summary stats (pay_max,
+max_late_streak, util_trend...), which throws away event *order* --
+"recovering after a bad patch" and "deteriorating" can share the same
+mean/max/streak. This model instead reads the panel as a real time series
+(6 timesteps x 8 channels, oldest month first) so the GRU can pick up
+trajectories the aggregates destroy.
 
 The engineered static features are concatenated onto the GRU's final hidden
-state, so the model sees both views rather than competing with lgbm_model.py's
-feature work.
+state, so it sees both views rather than duplicating lgbm_model.py's feature
+work.
 
-Same 5-fold CV as everything else via common.folds, so the OOF vector lines up
-for blending. Trained on BCE, which *is* the competition metric.
+Same 5-fold CV as everything else (via common.folds), so OOF lines up for
+blending. Trained on BCE, which is the competition's own metric.
 """
 
 import numpy as np
@@ -70,10 +70,9 @@ def panel(df):
 class Net(nn.Module):
     def __init__(self, n_static, n_chan=8, hidden=HIDDEN):
         super().__init__()
-        # Config from the hyperparameter search: smaller hidden state, 2 layers
-        # and heavier dropout beat the hand-picked hidden=64/dropout=0.3 single
-        # layer. Same lesson LightGBM taught -- at 24k rows, small and heavily
-        # regularized wins.
+        # From a hyperparameter search: smaller hidden size + 2 layers + more
+        # dropout beat the hand-picked hidden=64/dropout=0.3 single layer --
+        # same "small and regularized wins at 24k rows" lesson as LightGBM.
         self.gru = nn.GRU(n_chan, hidden, num_layers=2, batch_first=True,
                           bidirectional=True, dropout=0.4)
         self.head = nn.Sequential(
@@ -92,6 +91,32 @@ class Net(nn.Module):
         return self.head(torch.cat([h, static], dim=1)).squeeze(1)
 
 
+def _make_model(n_static, make_model=None):
+    factory = make_model or Net
+    return factory(n_static).to(DEV)
+
+
+def _tensor(array):
+    return torch.tensor(array, device=DEV)
+
+
+def _train_epoch(model, optimizer, loss_function, seq, static, target):
+    model.train()
+    permutation = torch.randperm(len(seq), device=DEV)
+    for start in range(0, len(seq), BATCH):
+        rows = permutation[start : start + BATCH]
+        optimizer.zero_grad()
+        loss = loss_function(model(seq[rows], static[rows]), target[rows])
+        loss.backward()
+        optimizer.step()
+
+
+def _predict(model, seq, static):
+    model.eval()
+    with torch.no_grad():
+        return torch.sigmoid(model(seq, static)).cpu().numpy()
+
+
 def fit_predict(seq_tr, st_tr, y_tr, seq_va, st_va, y_va, seq_te, st_te, seed,
                 make_model=None):
     """Train one net with early stopping on validation log loss.
@@ -101,31 +126,20 @@ def fit_predict(seq_tr, st_tr, y_tr, seq_va, st_va, y_va, seq_te, st_te, seed,
     code.
     """
     torch.manual_seed(seed)
-    make_model = make_model or (lambda n: Net(n))
-    model = make_model(st_tr.shape[1]).to(DEV)
-    opt = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
-    lossf = nn.BCEWithLogitsLoss()
+    model = _make_model(st_tr.shape[1], make_model)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
+    loss_function = nn.BCEWithLogitsLoss()
 
-    t = lambda a: torch.tensor(a, device=DEV)
-    seq_tr_t, st_tr_t, y_tr_t = t(seq_tr), t(st_tr), t(y_tr.astype(np.float32))
-    seq_va_t, st_va_t = t(seq_va), t(st_va)
-    seq_te_t, st_te_t = t(seq_te), t(st_te)
+    seq_tr_t = _tensor(seq_tr)
+    st_tr_t = _tensor(st_tr)
+    y_tr_t = _tensor(y_tr.astype(np.float32))
+    seq_va_t, st_va_t = _tensor(seq_va), _tensor(st_va)
+    seq_te_t, st_te_t = _tensor(seq_te), _tensor(st_te)
 
     best, best_state, bad = np.inf, None, 0
-    n = len(seq_tr)
     for epoch in range(MAX_EPOCHS):
-        model.train()
-        perm = torch.randperm(n, device=DEV)
-        for i in range(0, n, BATCH):
-            idx = perm[i : i + BATCH]
-            opt.zero_grad()
-            loss = lossf(model(seq_tr_t[idx], st_tr_t[idx]), y_tr_t[idx])
-            loss.backward()
-            opt.step()
-
-        model.eval()
-        with torch.no_grad():
-            p_va = torch.sigmoid(model(seq_va_t, st_va_t)).cpu().numpy()
+        _train_epoch(model, optimizer, loss_function, seq_tr_t, st_tr_t, y_tr_t)
+        p_va = _predict(model, seq_va_t, st_va_t)
         ll = log_loss(y_va, np.clip(p_va, 1e-7, 1 - 1e-7))
         if ll < best - 1e-5:
             best, bad = ll, 0
@@ -136,56 +150,41 @@ def fit_predict(seq_tr, st_tr, y_tr, seq_va, st_va, y_va, seq_te, st_te, seed,
                 break
 
     model.load_state_dict(best_state)
-    model.eval()
-    with torch.no_grad():
-        p_va = torch.sigmoid(model(seq_va_t, st_va_t)).cpu().numpy()
-        p_te = torch.sigmoid(model(seq_te_t, st_te_t)).cpu().numpy()
+    p_va = _predict(model, seq_va_t, st_va_t)
+    p_te = _predict(model, seq_te_t, st_te_t)
     return p_va, p_te, epoch - bad + 1
 
 
 def fit_full(seq_tr, st_tr, y_tr, seq_te, st_te, seed, epochs, make_model=None):
-    """Refit on ALL training rows for a fixed epoch count (no validation set to
-    early-stop on, so we reuse the average best epoch from CV -- same trick
-    lgbm_model.py uses with the average best boosting iteration).
+    """Refit on all training rows for a fixed epoch count.
 
-    The fold models each see only 80% of the data; this one sees 100%, and the
-    two are averaged for the test predictions.
+    No validation set to early-stop on, so we reuse the average best epoch
+    from CV (same trick lgbm_model.py uses with its average best boosting
+    iteration). Fold models each saw 80% of the data; this one sees 100%,
+    and the two get averaged for the test predictions.
     """
     torch.manual_seed(1000 + seed)
-    make_model = make_model or (lambda n: Net(n))
-    model = make_model(st_tr.shape[1]).to(DEV)
-    opt = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
-    lossf = nn.BCEWithLogitsLoss()
+    model = _make_model(st_tr.shape[1], make_model)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
+    loss_function = nn.BCEWithLogitsLoss()
 
-    t = lambda a: torch.tensor(a, device=DEV)
-    seq_tr_t, st_tr_t, y_tr_t = t(seq_tr), t(st_tr), t(y_tr.astype(np.float32))
-    n = len(seq_tr)
+    seq_tr_t = _tensor(seq_tr)
+    st_tr_t = _tensor(st_tr)
+    y_tr_t = _tensor(y_tr.astype(np.float32))
     for _ in range(epochs):
-        model.train()
-        perm = torch.randperm(n, device=DEV)
-        for i in range(0, n, BATCH):
-            idx = perm[i : i + BATCH]
-            opt.zero_grad()
-            lossf(model(seq_tr_t[idx], st_tr_t[idx]), y_tr_t[idx]).backward()
-            opt.step()
+        _train_epoch(model, optimizer, loss_function, seq_tr_t, st_tr_t, y_tr_t)
 
-    model.eval()
-    with torch.no_grad():
-        return torch.sigmoid(model(t(seq_te), t(st_te))).cpu().numpy()
+    return _predict(model, _tensor(seq_te), _tensor(st_te))
 
 
 def preprocessors(X, seq_all, rows):
     """Fit the static-feature and sequence-channel transforms on `rows` only.
 
-    Returns (static, norm): `static` turns a feature frame into the scaled,
-    one-hot-encoded matrix the head consumes; `norm` standardises a panel
-    tensor per channel.
-
-    Everything is fitted on `rows` and merely applied to anything else, which
-    is what keeps validation and test data out of the fit. Pass a training
-    fold during CV; pass every row for the full-data refit. Having one function
-    do both means the leakage discipline is stated once and can be checked in
-    one place.
+    Returns (static, norm): `static` scales + one-hot-encodes a feature frame
+    for the head; `norm` standardises a panel tensor per channel. Fitting
+    only on `rows` (a training fold during CV, or every row for the full
+    refit) is what keeps validation/test data out of the fit -- one function
+    for both cases means that leakage discipline lives in a single place.
     """
     num = [c for c in X.columns if c not in CATS]
     fit_on = X.iloc[rows]
@@ -245,10 +244,10 @@ def main():
     print()
     score("seq OOF", y, oof)
 
-    # Refit on all 24k rows at the average best epoch and average with the fold
-    # ensemble. The OOF above cannot measure this -- it only ever sees 80%-data
-    # fold models -- but the test predictions get a model trained on 25% more
-    # data, same rationale as lgbm_model.py's full refit.
+    # Refit on all 24k rows at the average best epoch, then average with the
+    # fold ensemble. OOF can't measure this gain (it only sees 80%-data fold
+    # models) but test predictions do, from a model trained on 25% more data
+    # -- same rationale as lgbm_model.py's full refit.
     n_epochs = max(1, int(np.mean(epochs_used)))
     print(f"\nfull-data refit at {n_epochs} epochs (avg best epoch across CV)", flush=True)
     static, norm = preprocessors(X, seq_all, np.arange(len(X)))   # fitted on everything
