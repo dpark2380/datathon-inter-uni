@@ -19,8 +19,10 @@ two things that actually worked were deriving information the dataset never stat
 to reduce variance. Seven other model families and six other feature families were
 tested and rejected on measurement, not intuition.
 
-We deliberately applied no calibration: we tested four methods and all of them made
-the score worse, because the probabilities were already well calibrated.
+We deliberately applied no calibration. We tested four methods — Platt scaling,
+isotonic regression, per-segment calibration and base-rate shrinkage. Three made the
+score worse and the fourth selected "no adjustment" on its own, because the
+probabilities were already well calibrated.
 
 # Data Cleaning and Preprocessing
 Before we started the task, we opened with preprocessing and cleaning to try to reduce the amount of useless information floatig around inside the dataset. By performing a deep dive into each of the variables and the meaning and information they represent, we identified a few pieces of data cleaning which we performed.
@@ -197,9 +199,16 @@ noise. We confirmed that by shrinking them halfway toward equal, the standard re
 overfitted weights, and the score got slightly *worse*.
 
 **We apply no calibration**, and that is a finding rather than an omission. We tested
-Platt scaling, isotonic regression, per-segment calibration and shrinkage toward the base
-rate. All of them made log loss worse under proper nested cross-validation, and the
-shrinkage search independently selected "do not adjust at all". A reliability diagram
+four methods, each under proper nested cross-validation:
+
+| Method | What it does | Result |
+|--------|--------------|--------|
+| Platt scaling | Fits a two-parameter sigmoid to the predicted probabilities | 0.42139, worse by 0.00004 — essentially a no-op |
+| Isotonic regression | Fits a free monotonic step function | 0.42508, worse by 0.00372 — the worst result we recorded |
+| Per-segment calibration | Separate curves by credit-limit quartile and lateness count | worse by 0.00030 |
+| Base-rate shrinkage | A one-parameter pull toward the 22.12% base rate | the search selected α = 1.00, i.e. "do not adjust at all" |
+
+Three made log loss worse; the fourth declined to change anything. A reliability diagram
 confirms our predicted probabilities track observed default rates across every decile.
 
 The only post-processing is clipping the final probabilities to `[1e-4, 1-1e-4]`, which
@@ -224,11 +233,12 @@ most decorrelated model we produced (0.948 against LightGBM) and still earned we
 while the GRU earned 0.30 at a *higher* correlation of 0.9825. What matters is whether the
 disagreement is informative, not whether it exists.
 
-**A mistake worth recording.** Isotonic calibration initially looked like a large win. It
-was being fitted on the same out-of-fold predictions it was then scored against, and a
-flexible monotonic function will happily absorb the noise in the rows judging it. Re-run
-with proper nested cross-validation it became the single worst result in our table. Every
-fitted combiner after that point was scored strictly out-of-fold.
+**A mistake worth recording.** Isotonic calibration initially looked like a large win —
+0.41946 against a 0.42136 baseline. It was being fitted on the same out-of-fold
+predictions it was then scored against, and a free monotonic function will happily
+absorb the noise in the rows judging it. Re-run with proper nested cross-validation it
+scored 0.42508, the single worst result in our table. Every fitted combiner after that
+point was scored strictly out-of-fold.
 
 **Limitations.**
 - **Part of this problem is unreachable from this data.** Our twenty worst-predicted

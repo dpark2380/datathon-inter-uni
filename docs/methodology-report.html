@@ -221,7 +221,7 @@
   <p class="measure">The relationship between the two held steady throughout (OOF &asymp; 0.4214 against hidden test &asymp; 0.4098), so OOF decided <em>whether</em> to adopt a change and the leaderboard only confirmed it.</p>
 
   <div class="callout measure">
-    <p><strong>The mistake that set the protocol.</strong> Isotonic calibration initially looked like a large win &mdash; 0.42107 against a 0.42136 baseline. It was being fitted on the same out-of-fold predictions it was then scored against, and a flexible monotonic function will happily absorb the noise in the rows judging it. Re-run under proper nested cross-validation it scored 0.42919, the single worst result in our table. Every fitted combiner after that point was scored strictly out-of-fold. We record it because the corrected number, not the original one, is what the rest of this report is built on.</p>
+    <p><strong>The mistake that set the protocol.</strong> Isotonic calibration initially looked like a large win &mdash; 0.41946 against a 0.42136 baseline. It was being fitted on the same out-of-fold predictions it was then scored against, and a flexible monotonic function will happily absorb the noise in the rows judging it. Re-run under proper nested cross-validation it scored 0.42508, the single worst result in our table. Every fitted combiner after that point was scored strictly out-of-fold. We record it because the corrected number, not the original one, is what the rest of this report is built on.</p>
   </div>
 </section>
 
@@ -341,7 +341,23 @@
   <p class="measure">For a customer where LightGBM says 30%, the GRU says 20% and TabPFN says 25%, the submitted probability is <code>0.45&times;0.30 + 0.30&times;0.20 + 0.25&times;0.25 = 26%</code>. The averaging is mathematically safe for this metric: log loss is convex, so by Jensen&rsquo;s inequality the loss of an averaged prediction never exceeds the average of the individual losses.</p>
 
   <h3 style="margin-top:30px;">Post-processing: one clip, and nothing else</h3>
-  <p class="measure"><strong>No calibration is applied</strong>, and that is a finding rather than an omission. Platt scaling, isotonic regression, per-segment calibration and base-rate shrinkage were each tested under nested cross-validation; all made log loss worse, and the shrinkage search independently selected &alpha; = 1.0, meaning &ldquo;do not adjust&rdquo;. The only post-processing is clipping the final probabilities to <code>[1e-4, 1&minus;1e-4]</code>, insurance against a single confidently-wrong prediction contributing an enormous penalty.</p>
+  <p class="measure"><strong>No calibration is applied</strong>, and that is a finding rather than an omission. Four methods were tested, each under nested cross-validation against a 0.42136 baseline.</p>
+
+  <div class="tbl-wrap">
+  <table class="data">
+    <thead>
+      <tr><th scope="col">Method</th><th scope="col">What it does</th><th scope="col" class="n">Result</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Platt scaling</td><td>Fits a two-parameter sigmoid to the predicted probabilities</td><td class="n">0.42139 <span class="flat">+0.00004</span></td></tr>
+      <tr><td>Isotonic regression</td><td>Fits a free monotonic step function</td><td class="n">0.42508 <span class="flat">+0.00372</span></td></tr>
+      <tr><td>Per-segment calibration</td><td>Separate curves by credit-limit quartile and lateness count</td><td class="n">&nbsp;<span class="flat">+0.00030</span></td></tr>
+      <tr><td>Base-rate shrinkage</td><td>A one-parameter pull toward the 22.12% base rate</td><td class="n">&alpha; = 1.00 <span class="flat">no-op</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="measure" style="margin-top:18px;">Three made log loss worse. The fourth declined to change anything: the shrinkage search was free to pick any &alpha; and independently selected 1.00, which means &ldquo;do not adjust&rdquo;. The only post-processing is clipping the final probabilities to <code>[1e-4, 1&minus;1e-4]</code>, insurance against a single confidently-wrong prediction contributing an enormous penalty.</p>
 
   <figure class="plate" style="max-width:520px;">
     <img src="assets/figures/reliability_diagram.png" alt="Reliability diagram: mean predicted probability against observed default rate per decile bin, sitting on the diagonal." loading="lazy">
