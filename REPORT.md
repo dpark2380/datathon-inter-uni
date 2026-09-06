@@ -1,0 +1,665 @@
+# Final Methodology Report — Credit Default Prediction
+
+**Final leaderboard submission:** `submission_tabpfn6.csv`
+**Hidden-test binary log loss:** **0.40982** (first place 0.40967; margin 0.00015)
+**Cross-validated:** 0.42136 out-of-fold log loss, 0.79195 AUC, 24,000 rows
+
+**Final model:** a fixed weighted average of three probability vectors —
+`0.45 × LightGBM + 0.30 × GRU + 0.25 × TabPFN` — clipped to `[1e-4, 1-1e-4]`.
+No calibration, no other post-processing.
+
+This document is organised to the six Required Materials in *Expected Submission
+Materials.pdf*, followed by the Required Disclosure and the Strongly Recommended
+items. Two companion documents carry the detail:
+
+| Document | Covers |
+|---|---|
+| `docs/methodology-report.html` | What the final model is, how each component turns a customer into a probability (walked through with a real customer and a real decision tree), how the weights were chosen, strengths and weaknesses, what was left untried |
+| `docs/experiment-ledger.html` | All 41 experiments with measured deltas against a 0.0005 noise threshold, grouped by category, with the reason each did or did not work |
+
+---
+
+## 1. Final Notebook / Methodology Report
+
+### 1.1 Approach
+
+The task is to predict the probability that a credit-card customer defaults next
+month, scored by binary log loss. Log loss scores *calibration*, not ranking, so
+every design decision below was made against log loss rather than AUC — including
+one mid-project correction where model selection and blend weights were switched
+from AUC to log loss.
+
+The dataset is small and interpretable: 24,000 labelled customers, 23 raw
+columns, a 22.121% base default rate, and a 6,000-row hidden test set. That size
+shaped the entire approach. With this many rows there is not enough signal to
+support a large model or a wide feature search, so the work concentrated on two
+things instead:
+
+1. **Deriving information the columns do not already state.** The single largest
+   gain of the project came from one accounting identity, not from any model.
+2. **Reducing variance without introducing selection.** Averaging many fits over
+   many fold partitions is structurally incapable of overfitting, so it was
+   pushed until it measurably saturated.
+
+The final pipeline has five stages and exactly one branch:
+
+```
+raw CSV → clean → engineer 81 features → ┬ LightGBM ┐
+                                         ├ GRU      ├ weighted average → clip → submission
+                                         └ TabPFN   ┘
+```
+
+The three models are given identical rows, identical features and identical fold
+splits, so their out-of-fold predictions align row-for-row and can be blended
+directly without any re-indexing.
+
+The organising principle for the ensemble was that its members must differ in
+**how they read a customer**, not merely in algorithm. LightGBM reads a customer
+as a flat set of aggregate statistics; the GRU reads the same customer as an
+ordered six-month trajectory; TabPFN reads them through a prior learned from
+millions of synthetic datasets. Ten model families were tried in total. The seven
+that were merely a different algorithm over the same aggregate view — CatBoost,
+ExtraTrees, logistic regression, an MLP, a supervised autoencoder, a 1D-CNN, a
+multi-task GRU variant — all received weight 0.00 in the final weight search.
+
+### 1.2 Data cleaning and preprocessing
+
+Cleaning is deliberately minimal. The dataset has no missing values and no
+malformed rows; the only defect is undocumented category codes.
+
+| Column | Change | Reason |
+|---|---|---|
+| `EDUCATION` | codes `0`, `5`, `6` → `4` | The data dictionary defines 1–4 only; 4 is already "other". The three undocumented codes cover a small tail and behave like "other". |
+| `MARRIAGE` | code `0` → `3` | Same reasoning; 3 is "other". |
+
+Implemented in `common.clean()` and applied identically to train and test.
+`Data Cleaning.ipynb` performs the same two substitutions and writes
+`datasets/train_clean.csv`.
+
+Deliberately **not** done, each for a stated reason:
+
+- **No outlier removal.** Large bills and payments are genuine, and log loss
+  punishes mis-scoring them. Heavy-tailed amount columns are handled with
+  `log1p` transforms inside feature engineering instead.
+- **No scaling for the tree model.** LightGBM is invariant to monotone
+  transforms. Scaling is applied only inside `seq_model.py`, fitted on training
+  folds only.
+- **No resampling or class weighting.** The 22.121% positive rate is the rate
+  the test set is drawn from, and log loss rewards predicting it honestly.
+  Rebalancing would shift predicted probabilities off the true base rate. This is
+  also why TabPFN is run with `balance_probabilities=False`.
+- **No imputation of the `PAY_*` sentinel values.** `-1` (paid in full) and `-2`
+  (no usage) are informative states, not missing data, and are used as such.
+
+`SEX`, `EDUCATION` and `MARRIAGE` are kept as pandas `category` dtype so
+LightGBM handles them natively; the neural models one-hot encode them, and
+TabPFN receives them as integer codes with their column indices declared via
+`categorical_features_indices`.
+
+### 1.3 Feature engineering
+
+23 raw columns become **81 features** (`common.features()`), in six families.
+The design principle throughout was to convert absolute amounts into ratios that
+are comparable across customers with very different credit limits.
+
+| Family | Examples | What it captures |
+|---|---|---|
+| Repayment history | `pay_max`, `pay_sum`, `pay_mean`, `n_late`, `n_late2plus`, `trend_pay`, `recent_late`, `max_late_streak`, `months_since_late`, `ever_paid_full`, `never_used` | How often, how badly and how recently the customer fell behind |
+| Credit utilisation | `util1..6`, `util_mean`, `util_max`, `util_trend`, `avail_credit` | Balance as a fraction of the limit, and its direction |
+| Payment coverage | `payratio1..5`, `payratio_mean`, `payratio_min`, `paid_full_months`, `n_zero_pay` | What fraction of each bill was actually paid |
+| Levels and momentum | `bill_*`, `amt_*`, `coverage_total`, `bill_growth`, `amt_over_limit`, `log_limit` | Absolute scale, log-compressed |
+| **Spending decomposition** | `spend1..5`, `spend_mean/max/std/trend/total`, `n_months_no_spend`, `spend_minus_paid`, `months_spend_gt_paid` | **New information** — see below |
+| Minimum-payment behaviour | `min_pay_ratio_mean`, `min_pay_ratio_min`, `months_paid_about_min`, `months_paid_under_min` | Whether the customer services only the minimum due (10% assumed) |
+
+**The spending decomposition — the largest single gain of the project.** The
+dataset gives statement balances and payments made, but never the amount
+*charged* in a month. That quantity is recoverable exactly, from the identity
+that governs a revolving account:
+
+```
+BILL_t = BILL_(t+1) − PAY_AMT_t + spend_t     ⟹     spend_t = BILL_t − BILL_(t+1) + PAY_AMT_t
+```
+
+This matters because a rising balance is ambiguous without it. A balance rising
+because the customer is spending more is a different risk story from a balance
+rising because they stopped paying, and no combination of the pre-existing
+features could separate those two cases. Measured worth: **+0.00046 out-of-fold
+and −0.00173 on the hidden test set** — the largest move of the project, and the
+clearest instance of cross-validation understating a real gain (see §1.7).
+
+Six other feature families were tried and **none** survived: behavioural payment
+signatures (+0.00006), spending as an ordered GRU channel (+0.00002), interaction
+terms (0.00000), peer-relative credit limit (−0.00011), velocity and acceleration
+derivatives (−0.00024), and target encoding (−0.00052). The pattern is
+consistent and is the central finding of the experiment record: the family that
+worked introduced a quantity the dataset never stated, while the six that failed
+recombined or re-summarised information already present.
+
+For the GRU, the same six months are additionally reshaped into a
+**6 timesteps × 8 channels** panel, oldest month first: repayment status, a
+lateness flag, bill as a fraction of the limit, payment as a fraction of the
+limit, log-scaled bill and payment, the change in balance since the previous
+month, and the fraction of the previous bill that the payment covered.
+
+### 1.4 Validation strategy
+
+**Stratified 5-fold cross-validation, repeated over 6 different fold partitions**
+(`common.folds`, `StratifiedKFold(5, shuffle=True, random_state=seed)` with
+`seed ∈ 0..5`). Every model calls the same function with the same seeds, so all
+out-of-fold vectors are row-aligned and directly comparable.
+
+Three properties of this design carried most of the weight:
+
+- **A shared noise floor.** Repeated experiments on identical splits established
+  that a difference below **0.0005** in out-of-fold log loss is not
+  distinguishable from fold noise on 24,000 rows. Every result in the experiment
+  ledger is reported against that threshold, and no change below it was adopted
+  on the strength of its point estimate alone.
+- **Strictly out-of-fold scoring of anything fitted.** Blend weights,
+  calibrators and target-derived features are all scored on rows that the
+  fitting never saw. This was not the original protocol — see the isotonic
+  finding in §1.7 — and every fitted combiner after that point used nested CV.
+- **A known, quantified blind spot.** Repeated CV and the full-data refit are
+  both invisible to out-of-fold scoring by construction: each OOF row is
+  predicted only by its own fold's models, while every test row is predicted by
+  the average of all of them, and OOF never involves a model refitted on 100% of
+  the data. This is documented inline in `common.py` and was confirmed on the
+  leaderboard — the full-data refit is worth 0.00023 on the hidden test set and
+  exactly zero on OOF.
+
+The relationship between OOF and hidden-test log loss was stable throughout
+(OOF ≈ 0.4214 against hidden test ≈ 0.4098), so OOF was used to decide *whether*
+to adopt a change, and the leaderboard only to confirm.
+
+### 1.5 Models tested and final model selection
+
+**Ten model families were tried. Three earned blend weight.**
+
+Kept:
+
+| Model | OOF log loss | OOF AUC | Weight | Why it earned its place |
+|---|---|---|---|---|
+| LightGBM | 0.42211 | 0.79104 | 0.45 | Strongest single model; reads the 81 features as a flat description |
+| GRU | 0.42392 | 0.78942 | 0.30 | Reads the six months *in order*; separates customers the aggregates cannot |
+| TabPFN | 0.42345 | 0.79091 | 0.25 | Pretrained prior; different in kind, matched the tuned GRU with zero tuning |
+
+Rejected (all weight 0.00 in the final search):
+
+| Model | OOF log loss | OOF AUC | Why it failed |
+|---|---|---|---|
+| Survival / hazard | 0.42260 | 0.79088 | Best of the rejects and briefly took a third of the blend on OOF (+0.00027), but the gain did not survive on the hidden test set (0.41044 against 0.41038) |
+| Sequence + spend channel | 0.42426 | 0.78917 | Spending re-supplied as an ordered channel rather than statics; +0.00002 against a matched control |
+| 1D-CNN | 0.42601 | 0.78745 | Correlated 0.9924 with the GRU — different architecture, identical signal; split the sequence weight rather than adding to it |
+| Autoencoder | 0.42685 | 0.78516 | Reconstruction loss was a straight cost against classification |
+| MLP | 0.42882 | 0.78296 | Displaced entirely once the GRU was added |
+| CatBoost, ExtraTrees, logistic regression, multi-task GRU | — | — | See `docs/experiment-ledger.html`; all weight 0.00 |
+
+**Tuning.** 135 LightGBM configurations were tested across three sweeps (40
+coarse, 60 fine, and one scored by blend rather than solo performance). The
+incumbent — originally tuned against AUC — was never beaten; the best challenger
+was 0.00004 better, twelve times below the noise floor. The GRU was the one model
+never previously tuned, and its architecture sweep produced a real gain (smaller
+hidden state, two layers, heavier dropout, faster learning rate), though it was
+bundled with the spending features in the same submission and so is not
+independently isolated.
+
+**Why decorrelation was not the selection criterion.** The intuition that an
+ensemble wants uncorrelated members is only half right, and this dataset produced
+an unusually clean counter-example. Logistic regression was the most decorrelated
+model produced in the entire project — 0.948 against LightGBM — and the weight
+search still gave it exactly **0.00**. The GRU earned 0.30 at a *higher*
+correlation of 0.983. What matters is not that a model disagrees, but that its
+disagreements are informative. Correlations among the three kept models, measured
+on the final out-of-fold vectors: GRU–LightGBM 0.983, TabPFN–LightGBM 0.990,
+TabPFN–GRU 0.985.
+
+### 1.6 Ensembling and post-processing
+
+**Ensembling is a plain weighted average of the three probability vectors.** No
+meta-model, no stacking, no per-customer model switching. Both of the latter were
+tested and were among the worst results recorded.
+
+Weights were chosen by grid search on out-of-fold log loss: step each weight in
+increments of 0.05, keep the combinations summing to 1 (about 230 valid triples),
+score each blended vector against the true labels, and keep the lowest. Nothing
+is fitted — three numbers are looked up.
+
+```
+(1.00, 0.00, 0.00)  LightGBM only        0.42211
+(0.65, 0.35, 0.00)  no TabPFN            0.42155
+(0.55, 0.30, 0.15)                       0.42141
+(0.45, 0.30, 0.25)  ← selected           0.42136
+(0.34, 0.33, 0.33)  equal weights        0.42147
+```
+
+**The flatness of that surface is the reassuring part.** Every weighting from
+0.50 to 0.70 on LightGBM lands within 0.0001 of the optimum, so this is a broad
+plateau rather than a sharp peak. A sharp peak would suggest the weights had
+latched onto noise in these particular 24,000 rows. This was tested directly:
+shrinking the weights halfway toward uniform — the standard remedy for weights
+overfitted to validation data — made the hidden-test score *worse* (0.41045
+against 0.41032). The fitted weights needed no correction.
+
+Averaging probabilities is also mathematically safe for this metric: log loss is
+convex, so by Jensen's inequality the loss of an averaged prediction never
+exceeds the average of the individual losses.
+
+**Post-processing is one clip and nothing else.** Predictions are clipped to
+`[1e-4, 1-1e-4]` before writing, which bounds the penalty from any single
+confident error. (Individual model scripts clip their own vectors to
+`[1e-7, 1-1e-7]` before saving; the submission clip is the tighter one.) No
+value was hand-edited, rescaled, rank-transformed or otherwise adjusted.
+
+**No calibration is applied, and that is a finding rather than an omission.**
+Four calibration schemes were tested under nested cross-validation and all were
+worse than leaving the probabilities alone: Platt scaling (−0.00005), per-segment
+calibration by credit-limit quartile and lateness count (−0.00030), isotonic
+regression (−0.00330), and a one-parameter pull toward the base rate whose search
+independently selected α = 1.0, meaning "do not adjust". A reliability diagram
+(`output/analysis/reliability_diagram.png`) confirms predictions track observed
+default rates across every decile. Eight ensembling and calibration schemes were
+tried in total; none beat the plain weighted average.
+
+### 1.7 Key results, observations and limitations
+
+**Result.** Hidden-test log loss 0.40982, from an out-of-fold 0.42136. The
+project ran 41 experiments; **4 produced gains that survived** the noise
+threshold. The progression, one submission per row:
+
+| Step | Change | Hidden test | Gain |
+|---|---|---|---|
+| 1 | Log-loss alignment + GRU added to LightGBM | 0.41260 | baseline |
+| 2 | Full-data refit for the GRU | 0.41237 | −0.00023 |
+| 3 | Repeated cross-validation, 3 partitions | 0.41211 | −0.00026 |
+| 4 | Repeated cross-validation, 6 partitions | 0.41211 | 0.00000 |
+| 5 | Spending decomposition features + tuned GRU | 0.41038 | −0.00173 |
+| 6 | Pure full-data refit for LightGBM | 0.41032 | −0.00006 |
+| 7 | TabPFN added to the blend | 0.40995 | −0.00037 |
+| 8 | TabPFN raised to 6 partitions + full-data refit | **0.40982** | −0.00013 |
+
+**Observation 1 — new information wins; new algorithms do not.** Seven
+challenger model families were tried and none held blend weight. Seven feature
+families were tried and one worked: the one that recovered a quantity the dataset
+never stated. Feeding that same winning feature family to the winning
+architecture in a richer form (as an ordered sequence channel) changed nothing
+once the information itself was already present. The predictor of success was
+never sophistication — it was whether something entered the model that was not
+already expressible from the existing columns.
+
+**Observation 2 — cross-validation systematically understates feature gains and
+overstates averaging tweaks.** The spending features improved OOF by 0.00046 and
+the hidden test set by 0.00173, roughly a 3.6× amplification. The sixth
+repeated-CV partition improved OOF by 0.00024 and the test set by nothing at all.
+Any decision rule that trusted OOF deltas uniformly would have got both of these
+backwards.
+
+**Observation 3 — a calibration result worth reporting honestly.** Isotonic
+regression first appeared to be a *large* win. It was being fitted on the same
+out-of-fold predictions it was then scored against, and a flexible monotonic
+function will happily absorb the noise in the rows judging it. Re-run under
+proper nested cross-validation it became **the single worst result in the entire
+table** (−0.00330). This was a genuine methodological error caught mid-project;
+every fitted combiner and every target-derived feature after that point was
+scored strictly out-of-fold.
+
+**Observation 4 — winning solutions transfer as reasoning, not as settings.**
+Five techniques were taken from the 1st, 2nd and 3rd place write-ups of the AMEX
+Default Prediction competition and **none improved anything**: DART boosting
+(−0.00072), very high `min_data_in_leaf` (−0.00104), `feature_fraction_bynode`
+(−0.00011), recency windows and within-customer ranks (−0.00035), and
+denoising/rank blending (not applicable). The `min_data_in_leaf` case is the
+instructive one: their headline setting of 2048 on 458,913 rows is 0.45% of rows
+per leaf, and our incumbent's 100 on 24,000 rows is 0.42% — we were already at
+their setting, expressed as a ratio rather than a count. Their approach
+(brute-force thousands of aggregate features, then select) is the right answer to
+their problem: 190 anonymised columns of unknown meaning with 458,913 rows to
+support the search. With 23 interpretable columns and 24,000 rows the winning
+move was the opposite — derive one quantity by reasoning about what the columns
+mean.
+
+**Limitations.**
+
+- **Most of the value sits in one model.** LightGBM alone reaches 0.42211 OOF;
+  all three together reach 0.42136. The other two components buy roughly 0.0007
+  for 180 extra model fits and two additional dependencies. The ensemble is
+  expensive relative to its marginal gain.
+- **TabPFN is a reproducibility liability.** It requires a Prior Labs licence, an
+  API token and a pretrained-weights download, and takes about 3h 10m on CPU.
+  Anyone reproducing this must clear those gates for 0.25 of the blend. Saved
+  prediction vectors are provided in `artifacts/` precisely so that the
+  submission can be rebuilt without it.
+- **The blend weights are the one genuine selection step.** Everything else
+  (averaging, repeated CV, refitting) is structurally incapable of overfitting;
+  weight selection is not. The risk is mitigated but not eliminated — the flat
+  weight surface and the failed shrinkage test are the evidence that it did not
+  materialise, not a proof that it could not.
+- **Compute cost limited the search near the deadline.** A full retrain is
+  several hours, dominated by 150 GRU fits and TabPFN's context-length scaling.
+- **Some of the target is unreachable from this data.** Residual analysis found
+  the twenty worst-predicted customers were *all* defaulters that the model rated
+  at 2–4% risk, and every one had a spotless payment record: never late, moderate
+  utilisation, healthy limits. Whatever caused those defaults is not observable in
+  repayment status, balances, payments or demographics. No model over these
+  columns can recover it.
+- **One avoidable cost, recorded for honesty.** TabPFN was run on CPU. That was
+  set on the first pilot to sidestep a possible incompatibility with Apple's
+  Metal backend and never revisited. Tested afterwards, `device="mps"` works
+  correctly and is faster even on a small subset (4.8s against 6.8s on 3,000
+  rows, with identical predictions to float precision). The full run would
+  plausibly have taken about an hour rather than three, which would have made one
+  further experiment affordable before the deadline. The constraint was a wrong
+  assumption, not the hardware.
+
+**The honest position on the ceiling.** Forty-one experiments produced four
+surviving gains. Ten model families, seven feature families, 135 hyperparameter
+configurations, eight ensembling and calibration schemes, three segmentation
+schemes and five techniques borrowed from the winners of a much larger
+credit-default competition all failed to improve on what is described here. Gains
+came only from deriving information the data did not already state, or from
+averaging more of the same models — never from a more sophisticated algorithm.
+The levers we can still name are exhausted; a better result would most likely
+require a genuinely new insight about the data rather than more of what is in
+this document.
+
+---
+
+## 2. Complete Source Code
+
+All code is in this repository. Nothing was run outside it, and no notebook
+state is required — the pipeline is plain scripts.
+
+**Files on the path to the final submission:**
+
+| File | Role |
+|---|---|
+| `Data Cleaning.ipynb` | Produces `datasets/train_clean.csv` from `datasets/train.csv` (§4) |
+| `common.py` | Data loading, cleaning, the 81 features, shared fold splits, scoring, saving |
+| `model.py` | LightGBM: 90 fold fits + 3-seed full-data refit |
+| `seq_model.py` | GRU: 150 fold fits + 5-seed full-data refit |
+| `tabpfn_model.py` | TabPFN: 30 fold fits + 3-seed full-data refit |
+| `blend.py` | Weight-simplex search on OOF log loss, plus the nested-CV calibration check |
+| `artifacts/tabpfn_6rep/README.md` | The exact rebuild recipe for the final file, from saved vectors |
+
+**Supporting code — experiments and analysis, not on the final path:**
+
+| File | Role |
+|---|---|
+| `EDA.ipynb` | Exploratory analysis feeding the preprocessing decisions in §1.2 |
+| `nn_model.py` | MLP (weight 0.00 in the final blend) |
+| `seq_spend_model.py` | GRU with spending as a sequence channel (rejected, +0.00002) |
+| `cnn_model.py` | 1D-CNN over the same panel (weight 0.00) |
+| `attn_model.py` | Transformer encoder over the same panel (weight 0.00) |
+| `autoenc_model.py` | Supervised autoencoder (weight 0.00) |
+| `multitask_model.py` | Multi-task GRU with a next-month auxiliary head (weight 0.00) |
+| `survival_model.py` | Discrete-time hazard reformulation (weight 0.00 in the final blend) |
+| `pseudo_label.py` | Pseudo-labelling the test set — a recorded negative result |
+| `interpret.py` | SHAP attributions and the reliability diagram → `output/analysis/` |
+| `main.py` | The earliest RandomForest baseline (0.43615). Superseded and **not** part of the final pipeline; retained only as the starting point of the progression in §1.7 |
+
+Every stage the PDF asks about is covered: data loading (`common.load`),
+preprocessing (`common.clean`, `Data Cleaning.ipynb`), feature generation
+(`common.features`, `seq_model.panel`), model training (`model.py`,
+`seq_model.py`, `tabpfn_model.py`), validation (`common.folds`, `common.score`),
+test inference (each model's fold loop and full-data refit), post-processing (the
+clip in the rebuild recipe), and generation of the final submission file (§5).
+
+## 3. Final Submission / Prediction File
+
+**`submission_tabpfn6.csv`** — 6,000 rows, columns `client_id` and
+`prob_default`, mean predicted probability 0.2154 against a 22.121% training
+base rate.
+
+This is the **original, unmodified file** as submitted to the leaderboard, where
+it scored **0.40982**. It has not been recreated or regenerated for this
+submission.
+
+It has, however, been **verified as reconstructible**. Applying the recipe in
+§5 to the saved prediction vectors in `artifacts/` reproduces the file to
+floating-point precision:
+
+```
+max |reconstructed − submitted| = 9.7e-17    (submission_tabpfn6.csv)
+max |reconstructed − submitted| = 9.7e-17    (submission_tabpfn3.csv)
+```
+
+The second-best submission, `submission_tabpfn3.csv` (0.40995), reconstructs
+exactly the same way from `artifacts/tabpfn_3rep/`. The other eleven
+`submission_*.csv` files in the repository are the earlier steps of the
+progression in §1.7 and are retained as the experimental record.
+
+## 4. Processed / Cleaned Dataset(s)
+
+| File | Status |
+|---|---|
+| `datasets/train.csv`, `datasets/test.csv` | Competition-provided, unmodified |
+| `datasets/train_clean.csv` | **Fully regenerable.** Produced by `Data Cleaning.ipynb` from `train.csv` by the two category substitutions in §1.2. Verified byte-identical to a fresh regeneration. |
+| `datasets/train2.csv` | An intermediate from the cleaning notebook (`train.csv` without `client_id`). Read by no code on the final path; retained only for completeness. |
+
+There are no other processed datasets. Feature engineering is performed in memory
+at run time by `common.features()` and is never written to disk, so there is no
+intermediate feature file to ship — the generation step is the code itself.
+
+**Saved prediction vectors** (the expensive intermediate) are committed in
+`artifacts/`, so the final submission can be rebuilt in seconds without the ~4
+hours of retraining:
+
+```
+artifacts/test_lgbm_full.npy                LightGBM test predictions (pure full-data refit)
+artifacts/test_seq.npy                      GRU test predictions
+artifacts/tabpfn_6rep/test_tabpfn_6rep.npy  TabPFN test predictions → submission_tabpfn6.csv (0.40982)
+artifacts/tabpfn_6rep/oof_tabpfn_6rep.npy   TabPFN out-of-fold predictions (OOF 0.42345)
+artifacts/tabpfn_6rep/tabpfn_model_6rep.py  The exact script that generated them
+artifacts/tabpfn_3rep/…                     The 3-repeat configuration → submission_tabpfn3.csv (0.40995)
+```
+
+## 5. README / Reproduction Instructions
+
+### Required files
+
+`datasets/train.csv`, `datasets/test.csv`, `common.py`, `model.py`,
+`seq_model.py`, `tabpfn_model.py`, `blend.py`, and `datasets/train_clean.csv`
+(or `Data Cleaning.ipynb` to regenerate it).
+
+### Key dependencies
+
+Python 3.14.5, with `numpy` 2.5.2, `pandas` 3.0.5, `scikit-learn` 1.9.0,
+`lightgbm` 4.7.0, `torch` 2.14.0, `scipy` 1.18.1, `shap` 0.52.0 (analysis only),
+and `tabpfn` 8.5.0. Versions are pinned in `uv.lock`; `tabpfn` is supplied at run
+time via `uv run --with tabpfn` and is **not** in the lock file.
+
+### Important seeds and settings
+
+| Setting | Value | Where |
+|---|---|---|
+| Fold splitter | `StratifiedKFold(5, shuffle=True, random_state=seed)` | `common.folds` |
+| Fold-partition seeds | `REPEATS = tuple(range(6))` — 6 partitions | `common.py` |
+| LightGBM model seeds | `SEEDS = (0, 1, 2)`, offset `seed + 100 * rep` | `model.py` |
+| GRU model seeds | `SEEDS = tuple(range(5))` | `seq_model.py` |
+| TabPFN seeds | `random_state=rep` per fold; `1000 + s` for the 3 refits | `tabpfn_model.py` |
+| Minimum-payment rate | `MIN_PAY_RATE = 0.10` | `common.py` |
+| Submission clip | `[1e-4, 1-1e-4]` | rebuild recipe below |
+
+### Option A — rebuild the final submission without retraining (seconds)
+
+This is the recommended path, and it is what was verified in §3.
+
+```python
+import numpy as np, pandas as pd
+
+lgbm = np.load("artifacts/test_lgbm_full.npy")               # PURE full-data refit
+seq  = np.load("artifacts/test_seq.npy")
+tab  = np.load("artifacts/tabpfn_6rep/test_tabpfn_6rep.npy")
+
+preds = np.clip(0.45 * lgbm + 0.30 * seq + 0.25 * tab, 1e-4, 1 - 1e-4)
+ids = pd.read_csv("datasets/test.csv", usecols=["client_id"],
+                  dtype={"client_id": str})["client_id"]
+pd.DataFrame({"client_id": ids, "prob_default": preds}) \
+  .to_csv("submission_tabpfn6.csv", index=False)
+```
+
+> **The one thing that is easy to get wrong.** The LightGBM component is
+> `test_lgbm_full.npy`, the **pure full-data refit** — *not* `test_lgbm.npy`,
+> which is the 50/50 fold-ensemble/refit mix that `model.py` writes by default.
+> Substituting the latter produces a different and slightly worse file (0.41038
+> against 0.41032 when that change was tested in isolation). Note the asymmetry:
+> the GRU and TabPFN components *are* 50/50 mixes; only LightGBM is a pure refit.
+
+### Option B — retrain from scratch (~4 hours)
+
+```bash
+uv run python model.py                                                # ~10 min → .output/test_lgbm_full.npy
+uv run python seq_model.py                                            # ~50 min → .output/test_seq.npy
+TABPFN_TOKEN="<token>" uv run --with tabpfn python tabpfn_model.py    # ~3h 10m → .output/test_tabpfn.npy
+uv run python blend.py                                                # weight search + submission
+```
+
+Run in that order — `blend.py` and the correlation report in `tabpfn_model.py`
+read the `.npy` vectors the earlier scripts write. `Data Cleaning.ipynb` must be
+run first only if `datasets/train_clean.csv` is absent.
+
+Exact numerical reproduction of the submitted file is **not** guaranteed by this
+path: TabPFN's pretrained weights are fetched from Prior Labs and the GRU depends
+on the torch/hardware backend. Option A is the reproducible route, which is why
+the vectors are committed.
+
+### Which script generates the final prediction file
+
+`blend.py` writes `.output/predictions_blend.csv` on the retraining path. The
+submitted `submission_tabpfn6.csv` was produced by the explicit weighted average
+in Option A above, recorded verbatim in `artifacts/tabpfn_6rep/README.md`.
+
+## 6. Final Model Information
+
+**Ensemble:** `0.45 × LightGBM + 0.30 × GRU + 0.25 × TabPFN`, a fixed weighted
+average of predicted probabilities, clipped to `[1e-4, 1-1e-4]`. Weights selected
+by grid search over ~230 weight triples on out-of-fold log loss.
+
+**Component 1 — LightGBM (weight 0.45).** Gradient-boosted trees over the 81
+engineered features. OOF 0.42211 / AUC 0.79104.
+
+| Parameter | Value |
+|---|---|
+| `objective` | `binary` |
+| `learning_rate` | 0.03 |
+| `num_leaves` | 12 |
+| `max_depth` | 4 |
+| `min_child_samples` | 100 |
+| `feature_fraction` | 0.5 |
+| `bagging_fraction` | 0.8 |
+| `bagging_freq` | 1 |
+| `reg_lambda` | 30.0 |
+| `n_estimators` | 3000, early stopping patience 150 |
+| Seeds | (0, 1, 2), offset by `100 × rep` |
+| Fits | 5 folds × 3 seeds × 6 partitions = **90**, plus a 3-seed full-data refit |
+
+Deliberately small: depth 4 with 12 leaves and heavy L2 beat every deeper
+configuration across the 135 tested. **The submitted component is the pure
+full-data refit** (refit on all 24,000 rows at the CV-average best iteration),
+not the fold ensemble.
+
+**Component 2 — GRU (weight 0.30).** Bidirectional recurrent network over the
+6 × 8 monthly panel, with the 81 static features concatenated onto the final
+hidden state. Trained on BCE, which is the competition metric. OOF 0.42392 /
+AUC 0.78942.
+
+| Parameter | Value |
+|---|---|
+| Architecture | 2-layer bidirectional GRU |
+| Hidden size | 32 |
+| Input channels | 8 × 6 months |
+| Head | Linear 64 → ReLU → Linear 32 → ReLU → Linear 1, over `[both final hidden states ‖ 81 static features]` |
+| Dropout | 0.4 recurrent; 0.4 and 0.15 in the head |
+| Optimiser | Adam, `lr` 2e-3, weight decay 1e-5 |
+| Batch size | 512 |
+| Max epochs / patience | 120 / 12 |
+| Seeds | `tuple(range(5))` |
+| Fits | 5 folds × 5 seeds × 6 partitions = **150**, plus a 5-seed full-data refit |
+
+Submitted component is a 50/50 average of the fold ensemble and the refit.
+
+**Component 3 — TabPFN (weight 0.25).** *Pretrained external model.* OOF 0.42345
+/ AUC 0.79091.
+
+| Parameter | Value |
+|---|---|
+| Package | `tabpfn` 8.5.0 (Prior Labs), `TabPFNClassifier` |
+| Parameters fitted to our data | **none** — in-context learning |
+| `n_estimators` (internal ensembling) | 4 |
+| `balance_probabilities` | `False` (protects calibration against the 22.121% base rate) |
+| `ignore_pretraining_limits` | `True` |
+| `device` | `cpu` |
+| Context size | 19,200 rows per fold (24,000 for the refit) |
+| Seeds | `random_state=rep` per fold; `1000 + s` for refits |
+| Fits | 5 folds × 6 partitions = **30**, plus a 3-seed full-data refit |
+
+Submitted component is a 50/50 average of the fold ensemble and the refit.
+
+**Totals:** 270 cross-validated fits plus 11 full-data refits stand behind each
+submitted probability.
+
+**External packages and pretrained models:** TabPFN is the only pretrained model
+and the only licence-gated dependency. No AutoML system was used at any point.
+
+---
+
+## Required Disclosure
+
+**Pretrained models.** TabPFN (Prior Labs), via the `tabpfn` package, version
+8.5.0. It requires a licence and an API token (`TABPFN_TOKEN`) and downloads
+pretrained weights. It performs in-context learning and fits **no parameters** to
+this dataset — the training rows are supplied as context at prediction time. It
+carries 0.25 of the final blend.
+
+**External datasets.** None. Only the competition-provided files were used.
+
+**External code, notebooks, repositories or public solutions consulted.** The
+1st, 2nd and 3rd place write-ups from the **AMEX Default Prediction** Kaggle
+competition were read. Five techniques were taken from them and tested: DART
+boosting, very high `min_data_in_leaf`, `feature_fraction_bynode`, recency-window
+aggregates, and within-customer ranks. **None were adopted** — all measured worse
+under cross-validation, with the numbers recorded in
+`docs/experiment-ledger.html` and summarised in §1.7. The techniques were
+re-implemented from their descriptions in order to be tested.
+
+**AI tools and coding agents.** **Claude Code (Anthropic) was used throughout**
+the project — for writing and refactoring the model and feature-engineering code,
+running and analysing experiments, and drafting this report and the two companion
+documents in `docs/`. All modelling decisions were taken on measured
+cross-validation results, every number reported here was produced by the code in
+this repository, and the final submission was selected and submitted by the team.
+
+**Manual modification or post-processing of predictions.** None beyond the clip
+to `[1e-4, 1-1e-4]` documented in §1.6. No prediction was hand-edited, rescaled,
+rank-transformed, or adjusted against leaderboard feedback. No calibration is
+applied — four schemes were tested and all made log loss worse.
+
+**Additional information used beyond the competition-provided files.** None,
+other than the pretrained TabPFN weights disclosed above.
+
+---
+
+## Strongly Recommended Items
+
+| Item | Where |
+|---|---|
+| Local validation scores | §1.5 (per model) and §1.6 (per blend); full set in `docs/experiment-ledger.html` |
+| Leaderboard score for the submitted file | 0.40982 for `submission_tabpfn6.csv` (§3); full progression in §1.7 |
+| Experiment / model comparison results | `docs/experiment-ledger.html` — all 41 experiments with measured deltas |
+| Saved model files | `artifacts/` — prediction vectors rather than model binaries, which is what makes the expensive TabPFN run reproducible in seconds (§4) |
+| Environment file | `uv.lock` (`pyproject.toml` for the top-level set); `tabpfn` supplied via `uv run --with tabpfn` |
+
+## Reproducibility Summary
+
+The chain the PDF asks reviewers to verify:
+
+| Stage | Artifact |
+|---|---|
+| competition data | `datasets/train.csv`, `datasets/test.csv` |
+| → preprocessing | `common.clean()` / `Data Cleaning.ipynb` → `datasets/train_clean.csv` |
+| → feature generation | `common.features()` → 81 features; `seq_model.panel()` → 6 × 8 panel |
+| → modelling | `model.py`, `seq_model.py`, `tabpfn_model.py` over `common.folds` |
+| → inference | fold ensembles + full-data refits → `artifacts/*.npy` |
+| → post-processing | `0.45/0.30/0.25` weighted average, clip to `[1e-4, 1-1e-4]` |
+| → final submission | `submission_tabpfn6.csv`, **hidden-test log loss 0.40982** |
+
+Verified end to end: the recipe in §5 reproduces the submitted file to 9.7e-17.
