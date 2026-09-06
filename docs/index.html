@@ -4,117 +4,134 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Credit Default Prediction — Submission Documents</title>
+<meta name="description" content="How a three-model ensemble predicts credit default at 0.40982 log loss, and the record of forty-one experiments behind it.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
-<style>
-  :root{
-    --ground:#F6F7F9; --panel:#FFFFFF; --panel-2:#ECEFF3;
-    --ink:#14181F; --ink-2:#3C4652; --ink-3:#6A7686;
-    --rule:#D2DAE2; --rule-soft:#E5EAEF;
-    --lgbm:#1F6F5C; --gru:#7A4E9C; --tab:#B26A16; --warn:#9E4A34;
-    --sans:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
-    --serif:"IBM Plex Serif",Georgia,serif;
-    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
-  }
-  @media (prefers-color-scheme:dark){
-    :root:not([data-theme="light"]){
-      --ground:#0C1016; --panel:#141A22; --panel-2:#1A222B;
-      --ink:#E7EDF4; --ink-2:#B3BFCC; --ink-3:#8492A2;
-      --rule:#28313C; --rule-soft:#1F2731;
-      --lgbm:#54C4A6; --gru:#B58BD6; --tab:#E0A254; --warn:#D98A70;
-    }
-  }
-  :root[data-theme="dark"]{
-    --ground:#0C1016; --panel:#141A22; --panel-2:#1A222B;
-    --ink:#E7EDF4; --ink-2:#B3BFCC; --ink-3:#8492A2;
-    --rule:#28313C; --rule-soft:#1F2731;
-    --lgbm:#54C4A6; --gru:#B58BD6; --tab:#E0A254; --warn:#D98A70;
-  }
-  *{box-sizing:border-box;}
-  body{background:var(--ground);color:var(--ink);font-family:var(--serif);
-    font-size:16px;line-height:1.62;margin:0;padding:0 20px 90px;}
-  .wrap{max-width:1120px;margin:0 auto;}
-  .measure{max-width:67ch;}
-  h1,h2,h3,.eyebrow,.stat b{font-family:var(--sans);}
-  h1{font-size:clamp(29px,4.2vw,44px);line-height:1.08;letter-spacing:-.022em;
-    font-weight:700;margin:0 0 14px;text-wrap:balance;}
-  h2{font-size:19px;font-weight:600;letter-spacing:-.012em;margin:0;}
-  p{margin:0 0 14px;}
-  a{color:var(--lgbm);}
-  .eyebrow{font-size:11px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
-    color:var(--ink-3);margin:0 0 10px;}
-  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums;}
-  code{font-family:var(--mono);font-size:.88em;background:var(--panel-2);
-    padding:1px 5px;border-radius:3px;}
-  header.top{border-bottom:2px solid var(--ink);padding:50px 0 26px;margin-bottom:34px;}
-  .sub{color:var(--ink-2);font-size:17px;margin:0;}
-
-  .figures{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-    border:1px solid var(--rule);background:var(--panel);margin-top:24px;}
-  .stat{padding:15px 17px;border-right:1px solid var(--rule);}
-  .stat:last-child{border-right:none;}
-  .stat span{display:block;font-family:var(--sans);font-size:10.5px;font-weight:600;
-    letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px;}
-  .stat b{display:block;font-family:var(--mono);font-size:24px;font-weight:600;
-    letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums;}
-  .stat i{display:block;font-style:normal;font-size:12px;color:var(--ink-3);
-    margin-top:5px;font-family:var(--sans);}
-
-  .docs{display:grid;gap:14px;margin-top:26px;}
-  .doc{display:block;border:1px solid var(--rule);border-left-width:3px;
-    background:var(--panel);padding:16px 18px 17px;text-decoration:none;color:inherit;}
-  .doc:hover{background:var(--panel-2);}
-  .doc.m{border-left-color:var(--lgbm);}
-  .doc.l{border-left-color:var(--gru);}
-  .doc h2{color:var(--lgbm);}
-  .doc.l h2{color:var(--gru);}
-  .doc p{margin:6px 0 0;font-size:14.5px;color:var(--ink-2);}
-  .doc .file{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);
-    margin-top:9px;display:block;}
-
-  .note{border-left:2px solid var(--warn);padding:2px 0 2px 18px;margin:30px 0 0;
-    color:var(--ink-2);font-size:14.5px;}
-  .note strong{font-family:var(--sans);color:var(--ink);}
-  footer{margin-top:50px;padding-top:18px;border-top:1px solid var(--rule);
-    font-family:var(--sans);font-size:12.5px;color:var(--ink-3);}
-</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&display=swap">
+<link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
+
+<button class="navbtn" aria-expanded="false" aria-controls="nav"><span></span>Contents</button>
+
+<nav class="nav" id="nav" aria-label="Document contents">
+  <a class="brand" href="index.html"><b>Credit default prediction</b><span>submission documents</span></a>
+  <p class="score"><span>hidden test</span><b>0.40982</b></p>
+
+  <p class="grp">Overview</p>
+  <ol>
+    <li><a class="item" href="#result"><span class="no">·</span>The result</a></li>
+    <li><a class="item" href="#reading"><span class="no">·</span>What is here</a></li>
+    <li><a class="item" href="#disclosure"><span class="no">·</span>Disclosure</a></li>
+    <li><a class="item" href="#repro"><span class="no">·</span>Reproducing it</a></li>
+  </ol>
+
+  <p class="grp">Methodology report</p>
+  <ol>
+    <li><a class="item" href="methodology-report.html#pipeline"><span class="no">1</span>Pipeline</a></li>
+    <li><a class="item" href="methodology-report.html#components"><span class="no">2</span>The three components</a></li>
+    <li><a class="item" href="methodology-report.html#mechanics"><span class="no">3</span>How a prediction is computed</a></li>
+    <li><a class="item" href="methodology-report.html#blend"><span class="no">4</span>Combining the three</a></li>
+    <li><a class="item" href="methodology-report.html#provenance"><span class="no">5</span>How we arrived here</a></li>
+    <li><a class="item" href="methodology-report.html#assessment"><span class="no">6</span>Strengths and weaknesses</a></li>
+    <li><a class="item" href="methodology-report.html#next"><span class="no">7</span>What we would try next</a></li>
+  </ol>
+
+  <p class="grp">Experiment ledger</p>
+  <ol>
+    <li><a class="item" href="experiment-ledger.html#survived"><span class="no">1</span>The changes that survived</a></li>
+    <li><a class="item" href="experiment-ledger.html#ledger"><span class="no">2</span>All 41 experiments</a></li>
+    <li><a class="item" href="experiment-ledger.html#patterns"><span class="no">3</span>What the record shows</a></li>
+  </ol>
+
+  <p class="foot">Source<br><a href="https://github.com/dpark2380/datathon-inter-uni">github.com/dpark2380/<wbr>datathon-inter-uni</a></p>
+</nav>
+
+<main class="page">
 <div class="wrap">
 
 <header class="top">
-  <p class="eyebrow">Credit default prediction &middot; submission documents</p>
+  <p class="kicker">Credit default prediction · submission documents</p>
   <h1>How the model works, and everything we tried to get there</h1>
-  <p class="sub measure">Two standalone documents accompanying the final submission: what the model is and why, and the full record of the forty-one experiments behind it.</p>
-  <div class="figures">
-    <div class="stat"><span>Hidden test</span><b>0.40982</b><i>binary log loss</i></div>
-    <div class="stat"><span>Blend</span><b>0.45 / 0.30 / 0.25</b><i>LightGBM / GRU / TabPFN</i></div>
-    <div class="stat"><span>Experiments</span><b>41</b><i>4 helped, 37 did not</i></div>
-  </div>
+  <p class="sub measure">A weighted average of three models that read the same customers in three different ways. Each earned its place by measurement; thirty-seven other candidates did not.</p>
 </header>
 
-<div class="docs">
-  <a class="doc m" href="methodology-report.html">
-    <h2>Methodology report</h2>
-    <p>What the final model is, how each of the three components makes a prediction, how the blend weights were chosen, and where it is weak.</p>
-    <span class="file">methodology-report.html</span>
-  </a>
-  <a class="doc l" href="experiment-ledger.html">
-    <h2>Experiment ledger</h2>
-    <p>All 41 experiments with measured deltas against the 0.0005 noise threshold, and why each one did or did not work.</p>
-    <span class="file">experiment-ledger.html</span>
-  </a>
-</div>
+<section id="result">
+  <div class="sechead"><h2>The result</h2></div>
+  <p class="lede measure">The submitted model is a plain weighted average of three probabilities. No meta-model, no calibration, no post-processing beyond clipping. Its accounts read as follows.</p>
 
-<div class="note measure">
-  <strong>Final result.</strong> Hidden-test log loss <span class="mono">0.40982</span>, from a plain weighted average of probabilities &mdash; 0.45 LightGBM + 0.30 GRU + 0.25 TabPFN &mdash; with no calibration or post-processing beyond clipping to [1e-4, 1&minus;1e-4]. Disclosures (pretrained model, AI coding agent, external solutions consulted) are in the <a href="https://github.com/dpark2380/datathon-inter-uni/blob/main/docs/README.md">docs README</a>.
-</div>
+  <div class="stmt">
+    <table>
+      <caption>Solo scores are out-of-fold log loss on 24,000 labelled customers.</caption>
+      <thead>
+        <tr><th scope="col">Component</th><th scope="col">Weight</th><th scope="col">Solo OOF</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><i class="swatch sw-l"></i>LightGBM</td><td>0.45</td><td>0.42211</td></tr>
+        <tr><td><i class="swatch sw-g"></i>GRU</td><td>0.30</td><td>0.42392</td></tr>
+        <tr><td><i class="swatch sw-t"></i>TabPFN</td><td>0.25</td><td>0.42345</td></tr>
+        <tr class="total">
+          <td>Blended, out-of-fold<span class="qual">weighted average of probabilities</span></td>
+          <td>1.00</td><td>0.42136</td>
+        </tr>
+        <tr class="final">
+          <td>Hidden test<span class="qual">6,000 rows, binary log loss</span></td>
+          <td colspan="2">0.40982</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 
-<footer>
-  <p>Source: <a href="https://github.com/dpark2380/datathon-inter-uni">github.com/dpark2380/datathon-inter-uni</a></p>
+  <p class="note measure"><strong>Read the total honestly.</strong> The blend averages probabilities, not scores &mdash; you cannot arrive at 0.42136 by weighting the three numbers above. The averaging happens per customer, then the loss is measured once.</p>
+
+  <p class="measure">Three models, ten families tried. Eighty-one features, seven families tried. Two hundred and eighty-one fitted models stand behind each prediction: 270 cross-validated fold fits across six fold partitions, plus 11 refits on all 24,000 rows.</p>
+</section>
+
+<section id="reading">
+  <div class="sechead"><h2>What is here</h2></div>
+  <p class="lede measure">Two documents. The first answers &ldquo;what is this model and why&rdquo;; the second answers &ldquo;what else did you try&rdquo;.</p>
+
+  <div class="docs">
+    <a class="doc" href="methodology-report.html">
+      <span class="no">01</span>
+      <span>
+        <h3>Methodology report</h3>
+        <p>What the final model is, how each of the three components turns a customer into a number, how the blend weights were chosen, and where it is weak. Includes a real customer traced through the real model.</p>
+      </span>
+    </a>
+    <a class="doc" href="experiment-ledger.html">
+      <span class="no">02</span>
+      <span>
+        <h3>Experiment ledger</h3>
+        <p>All 41 experiments with measured deltas against the 0.0005 fold-noise threshold, and why each one did or did not work. Four helped. The other thirty-seven are the more useful half of the record.</p>
+      </span>
+    </a>
+  </div>
+</section>
+
+<section id="disclosure">
+  <div class="sechead"><h2>Disclosure</h2></div>
+  <ul class="deflist measure">
+    <li><b>Pretrained model used</b>TabPFN (Prior Labs), via the <code>tabpfn</code> package. Requires a licence and API token; performs in-context learning and fits no parameters to this dataset.</li>
+    <li><b>AI coding agent used</b>Claude Code, throughout.</li>
+    <li><b>External solutions consulted</b>The 1st, 2nd and 3rd place write-ups from the AMEX Default Prediction competition. Five techniques were tested from them &mdash; DART boosting, high <code>min_data_in_leaf</code>, <code>feature_fraction_bynode</code>, recency-window aggregates, within-customer ranks. None were adopted; all measured worse on cross-validation. The numbers are in <a href="experiment-ledger.html#ledger">the ledger</a>.</li>
+    <li><b>External datasets used</b>None. Only the competition-provided files.</li>
+    <li><b>Manual modification of predictions</b>None beyond clipping to [1e-4, 1&minus;1e-4].</li>
+  </ul>
+</section>
+
+<section id="repro">
+  <div class="sechead"><h2>Reproducing it</h2></div>
+  <p class="measure">Saved prediction vectors and per-component reproduction instructions are in <code>artifacts/</code>. The submitted file is <code>submissions/submission_tabpfn6.csv</code>. A full retrain is several hours, dominated by 150 GRU fits and TabPFN&rsquo;s context-length scaling.</p>
+</section>
+
+<footer class="doc-foot">
+  Ensemble: 0.45 &times; LightGBM (81 features, 90 fits + full-data refit) + 0.30 &times; bidirectional GRU (6&times;8 panel, 150 fits + refit) + 0.25 &times; TabPFN (30 fits + refit, pretrained). Fixed seeds; six stratified 5-fold partitions; probabilities clipped to [1e-4, 1&minus;1e-4] and otherwise unmodified. Out-of-fold log loss 0.42136 on 24,000 customers; 0.40982 on the 6,000-row hidden test set.
 </footer>
 
 </div>
+</main>
+
+<script src="assets/site.js"></script>
 </body>
 </html>
