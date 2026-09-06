@@ -132,3 +132,48 @@ needs to be run before step 3.
   the AMEX Default Prediction competition. Five techniques were tested from them which are DART boosting, `min_data_in_leaf`, `feature_fraction_bynode`,
   recency-window aggregates, within-customer ranks. **None were used in the final submission** as they all measured worse under cross-validation.
 
+<<<<<<< HEAD
+=======
+## Known limitations
+
+- `EDUCATION="other"` (387 customers, 28 defaults) is over-predicted by ~61%
+  relative and ranked poorly (AUC 0.645 against ~0.79 elsewhere). That category
+  is where `clean()` collapses undocumented codes 0, 5 and 6, so it is a
+  heterogeneous catch-all. It is the one subgroup where the model performs worse
+  than predicting that group's own base rate.
+- A meaningful share of defaults appear unpredictable from these columns: the 20
+  worst-predicted customers are all defaulters with spotless payment histories.
+- The blend weights are fitted to out-of-fold data, which is the one step in the
+  pipeline where selection — and so overfitting risk — genuinely occurs. The
+  weight surface is flat and shrinking toward uniform made the score worse, both
+  of which suggest the fit is stable.
+
+### End-to-End Pipeline Architecture                                                                
+                                                                                                      
+    [ datasets/train_clean.csv & test.csv ]                                                           
+                       │                                                                              
+                       ▼  Step 1: Data Cleaning (models/common.py:L29-36)                             
+             [ Collapsed Categories ]                                                                 
+                       │                                                                              
+             ┌─────────┴──────────────────────────────────────────┐                                   
+             ▼                                                    ▼                                   
+    Step 2A: 81 Tabular Features                      Step 2B: 6x8 Temporal Panel                     
+    (models/common.py:L39-142)                         (models/seq_model.py:L40-68)                   
+             │                                                    │                                   
+             ├──────────────────────────┐                         │                                   
+             ▼                          ▼                         ▼                                   
+       Step 3: LightGBM           Step 5: TabPFN            Step 4: Bi-GRU                            
+      (models/model.py)      (models/tabpfn_model.py)    (models/seq_model.py)                        
+       90 trees + refit          30 fits + refit           150 nets + refit                           
+             │                          │                         │                                   
+             └──────────────────────────┼─────────────────────────┘                                   
+                                        │                                                             
+                                        ▼  Step 6: Blending & Calibration (models/blend.py)           
+                          [ 45% LGBM + 30% GRU + 25% TabPFN ]                                         
+                                        │                                                             
+                                        ▼  Step 7: Bounded Clipping [1e-4, 1-1e-4]                    
+                          [ submissions/submission_tabpfn6.csv ] (0.40982)                            
+                                        │                                                             
+                                        ▼  Step 8: Governance, SHAP & Fairness                        
+                          (models/interpret.py & models/fairness_audit.py)  
+>>>>>>> e609fda7bc19b52e15108064cc7d25fc44ab33b7

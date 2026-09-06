@@ -3,9 +3,11 @@
 # Python
 # graphify build output
 *.pyc
-.claude/settings.local.json
+.claude/
 .output
 .venv/
 __pycache__/
 catboost_info/
+docs/
 graphify-out/
+CLAUDE.md
