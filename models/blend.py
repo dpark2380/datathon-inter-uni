@@ -1,20 +1,19 @@
 """Blend the LightGBM, GRU-sequence and TabPFN predictions into the submission.
 
-Run lgbm_model.py, seq_model.py and tabpfn_model.py first; this reads the vectors
-they saved, searches the weight simplex for the combination that minimises OOF
-log loss (the competition's actual metric), checks whether a Platt or isotonic
-recalibration lowers it further, and writes .output/predictions_blend.csv --
-the file submitted to the leaderboard.
+Run lgbm_model.py, seq_model.py and tabpfn_model.py first. This loads their
+saved OOF/test vectors, searches the weight simplex for the mix that
+minimises OOF log loss (the competition metric), checks whether Platt or
+isotonic recalibration helps further, and writes the submitted file:
+.output/predictions_blend.csv.
 
-Two details that matter for reproducing the submitted result:
+Two details needed to reproduce the submitted result:
 
-  * The LightGBM component uses test_lgbm_full.npy, the PURE full-data refit,
-    not the 50/50 fold/refit mix in test_lgbm.npy. Submitting the latter scored
-    0.41038 where the former scored 0.41032 when tested in isolation.
-  * rejected/nn_model.py's MLP is deliberately absent. The weight search drove it to
-    0.00 from the moment the GRU existed -- the GRU does the same job better --
-    so it is kept in the repo as a tested-and-rejected model rather than
-    carried here.
+  * LightGBM's component is test_lgbm_full.npy (the pure full-data refit),
+    not the 50/50 fold/refit mix in test_lgbm.npy -- the pure refit scored
+    0.41032 vs 0.41038 when tested in isolation.
+  * rejected/nn_model.py's MLP is deliberately excluded: the weight search
+    always drove it to 0.00 once the GRU existed, so it's kept only as a
+    tested-and-rejected model, not carried here.
 """
 
 import numpy as np
@@ -44,6 +43,7 @@ def main():
 
     for m in MODELS:
         score(m, y, oof[m])
+
     print("\ncorrelation with lgbm:  " + "  ".join(
         f"{m} {np.corrcoef(oof['lgbm'], oof[m])[0, 1]:.4f}" for m in MODELS if m != "lgbm"
     ))
@@ -71,12 +71,11 @@ def main():
     oof_blend = sum(wi * oof[m] for wi, m in zip(best, MODELS))
     test_blend = sum(wi * test[m] for wi, m in zip(best, MODELS))
 
-    # Check whether recalibrating the blend's probabilities lowers OOF log
-    # loss further. Isotonic regression is flexible enough to overfit the
-    # exact points it's scored on, so this is evaluated with its own nested
-    # CV (reusing common.folds) rather than fit-and-score on the same rows --
-    # otherwise a flexible calibrator always looks like it wins. "none" is
-    # always in the running, so calibration can only help or be a no-op.
+    # Check whether recalibrating the blend lowers OOF log loss further.
+    # Isotonic regression can overfit the exact points it's scored on, so
+    # this uses its own nested CV (common.folds) instead of fit-and-score on
+    # the same rows -- otherwise a flexible calibrator always "wins". "none"
+    # stays in the running, so calibration can only help, never hurt.
     def logit(p):
         return np.log(np.clip(p, EPS, 1 - EPS) / (1 - np.clip(p, EPS, 1 - EPS))).reshape(-1, 1)
 
