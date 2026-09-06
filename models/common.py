@@ -35,8 +35,8 @@ def clean(df):
     defines 1-4 and 1-3). Found during EDA in 2_Column_Inspection.ipynb, but
     fixed only here so train and test always get identical treatment.
 
-    Idempotent -- safe to call again on train_clean.csv, which already has
-    this applied.
+    Idempotent, so it's safe to call again on train_clean.csv, which already
+    has this applied.
     """
     df = df.copy()
     df["EDUCATION"] = df["EDUCATION"].replace({0: 4, 5: 4, 6: 4})
@@ -108,7 +108,7 @@ def features(df):
     X["log_limit"] = np.log1p(lim)
 
     # Spending decomposition. The raw data has balances and payments but not
-    # the amount actually charged -- a balance rising from new spending is a
+    # the amount actually charged. A balance rising from new spending is a
     # different risk story than one rising from missed payments. Recovered
     # from the accounting identity (PAY_AMT_t pays down BILL_AMT_(t+1)):
     #     spend_t = BILL_t - BILL_(t+1) + PAY_AMT_t   (+ interest/fees)
@@ -162,7 +162,7 @@ def folds(X, y, seed=SEED):
 
     seed selects which split. Models loop over REPEATS of these so the test
     predictions average across several different partitions, not just several
-    seeds within one -- varying the partition decorrelates the ensemble more
+    seeds within one: varying the partition decorrelates the ensemble more
     than re-seeding a fixed one does.
     """
     return StratifiedKFold(5, shuffle=True, random_state=seed).split(X, y)

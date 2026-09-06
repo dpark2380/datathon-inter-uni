@@ -12,8 +12,8 @@ from sklearn.metrics import roc_auc_score
 from common import OUT, REPEATS, folds, load, save, score
 
 # Picked by a 5-fold sweep over depth/leaves/regularization. Shallow and
-# heavily regularized wins (0.7891 auc vs 0.7843 for deeper trees) -- the
-# signal here is mostly PAY_* history, and deeper trees just overfit it.
+# heavily regularized wins (0.7891 auc vs 0.7843 for deeper trees), since
+# the signal here is mostly PAY_* history, and deeper trees just overfit it.
 PARAMS = dict(
     objective="binary",
     learning_rate=0.03,
@@ -31,6 +31,12 @@ PARAMS = dict(
 SEEDS = (0, 1, 2)
 
 
+def make_model(seed, n_estimators=PARAMS["n_estimators"]):
+    """Build the final LightGBM configuration for a fold or full-data refit."""
+    params = {**PARAMS, "n_estimators": n_estimators}
+    return lgb.LGBMClassifier(**params, random_state=seed)
+
+
 def main():
     X, y, X_test, ids = load()
 
@@ -40,11 +46,10 @@ def main():
     n_models = 5 * len(SEEDS) * len(REPEATS)
 
     for rep in REPEATS:
-        splits = list(folds(X, y, seed=rep))
-        for fold, (tr, va) in enumerate(splits, 1):
+        for tr, va in folds(X, y, seed=rep):
             for seed in SEEDS:
-                m = lgb.LGBMClassifier(**PARAMS, random_state=seed + 100 * rep)
-                m.fit(
+                model = make_model(seed + 100 * rep)
+                model.fit(
                     X.iloc[tr],
                     y[tr],
                     eval_X=X.iloc[va],
@@ -54,9 +59,11 @@ def main():
                 )
                 # each repeat covers every row exactly once, so averaging the
                 # repeats gives each OOF row an equal-weight mean
-                oof[va] += m.predict_proba(X.iloc[va])[:, 1] / (len(SEEDS) * len(REPEATS))
-                test_pred += m.predict_proba(X_test)[:, 1] / n_models
-                rounds.append(m.best_iteration_ or PARAMS["n_estimators"])
+                oof[va] += model.predict_proba(X.iloc[va])[:, 1] / (
+                    len(SEEDS) * len(REPEATS)
+                )
+                test_pred += model.predict_proba(X_test)[:, 1] / n_models
+                rounds.append(model.best_iteration_ or PARAMS["n_estimators"])
         print(f"repeat {rep}  auc {roc_auc_score(y, oof * len(REPEATS) / (rep + 1)):.5f}")
 
     print()
@@ -66,9 +73,7 @@ def main():
     # fold ensemble; both are unbiased, averaging cuts variance.
     full_pred = np.zeros(len(X_test))
     for seed in SEEDS:
-        full = lgb.LGBMClassifier(
-            **{**PARAMS, "n_estimators": int(np.mean(rounds))}, random_state=seed
-        )
+        full = make_model(seed, n_estimators=int(np.mean(rounds)))
         full.fit(X, y)
         full_pred += full.predict_proba(X_test)[:, 1] / len(SEEDS)
     preds = 0.5 * test_pred + 0.5 * full_pred

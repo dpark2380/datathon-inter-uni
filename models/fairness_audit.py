@@ -1,6 +1,6 @@
 """Fairness audit: does the shipped blend treat demographic subgroups fairly?
 
-Run after lgbm_model.py, seq_model.py and tabpfn_model.py -- reads their
+Run after lgbm_model.py, seq_model.py and tabpfn_model.py. Reads their
 saved out-of-fold predictions, so results are honest on unseen rows. Prints
 one table per group (SEX, EDUCATION, MARRIAGE, AGE band): group size,
 default rate, mean predicted risk, calibration ratio, skill, and AUC.
@@ -20,9 +20,9 @@ easily confused:
   3. Does it RANK as well within each group?      (auc, skill)
      Worse ranking means worse decisions for those people.
 
-Raw log loss can't answer #3 on its own -- it isn't comparable across groups
+Raw log loss can't answer #3 on its own: it isn't comparable across groups
 with different base rates (a 7%-default group has a lower achievable loss
-than a 25% one, regardless of model quality -- EDUCATION="other" has the
+than a 25% one, regardless of model quality; EDUCATION="other" has the
 best raw loss here despite the worst AUC). `skill` fixes this: each group's
 loss divided by the loss of predicting that group's own base rate. Below 1
 beats that baseline; closer to 0 is better. Compare groups on `skill` and
@@ -94,7 +94,7 @@ def main():
         p = sum(w * np.load(OUT / f"oof_{m}.npy") for m, w in WEIGHTS.items())
     except FileNotFoundError as e:
         raise SystemExit(
-            f"missing {e.filename} -- run lgbm_model.py, seq_model.py and tabpfn_model.py first"
+            f"missing {e.filename}. Run lgbm_model.py, seq_model.py and tabpfn_model.py first"
         )
 
     print(f"blend OOF log loss {log_loss(y, p):.5f}   base rate {y.mean():.4f}   n = {len(y)}")
