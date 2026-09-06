@@ -1,664 +1,368 @@
 <!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Default Risk Experiment Ledger</title>
+<title>Experiment ledger — Credit Default Prediction</title>
+<meta name="description" content="All 41 experiments with measured deltas against the 0.0005 fold-noise threshold, and why each one did or did not work.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
-<style>
-  :root{
-    --ground:#F5F7F9;
-    --panel:#FFFFFF;
-    --panel-2:#EDF1F4;
-    --ink:#151A21;
-    --ink-2:#3D4855;
-    --ink-3:#6B7787;
-    --rule:#D3DBE3;
-    --rule-soft:#E4EAEF;
-    --win:#0B6E62;
-    --win-soft:#D3E9E5;
-    --loss:#9E4A34;
-    --loss-soft:#F0DCD6;
-    --null:#8792A0;
-    --thresh:#B07D14;
-    --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;
-    --serif:"IBM Plex Serif",Georgia,serif;
-    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
-  }
-  @media (prefers-color-scheme:dark){
-    :root:not([data-theme="light"]){
-      --ground:#0D1117;
-      --panel:#141A22;
-      --panel-2:#1B222B;
-      --ink:#E6EDF3;
-      --ink-2:#B4C0CD;
-      --ink-3:#8593A3;
-      --rule:#2A333E;
-      --rule-soft:#212934;
-      --win:#4BC0AC;
-      --win-soft:#123830;
-      --loss:#D98A70;
-      --loss-soft:#3A2119;
-      --null:#6E7C8C;
-      --thresh:#D9A93C;
-    }
-  }
-  :root[data-theme="dark"]{
-    --ground:#0D1117;
-    --panel:#141A22;
-    --panel-2:#1B222B;
-    --ink:#E6EDF3;
-    --ink-2:#B4C0CD;
-    --ink-3:#8593A3;
-    --rule:#2A333E;
-    --rule-soft:#212934;
-    --win:#4BC0AC;
-    --win-soft:#123830;
-    --loss:#D98A70;
-    --loss-soft:#3A2119;
-    --null:#6E7C8C;
-    --thresh:#D9A93C;
-  }
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..600&display=swap">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
 
-  *{box-sizing:border-box;}
-  body{
-    background:var(--ground);
-    color:var(--ink);
-    font-family:var(--serif);
-    font-size:16px;
-    line-height:1.62;
-    margin:0;
-    padding:0 20px 96px;
-  }
-  .wrap{max-width:1180px;margin:0 auto;}
-  .measure{max-width:66ch;}
+<button class="navbtn" aria-expanded="false" aria-controls="nav"><span></span>Contents</button>
 
-  h1,h2,h3,.eyebrow,th,.num,.pill,.stat b{font-family:var(--sans);}
-  h1{
-    font-size:clamp(30px,4.4vw,46px);
-    line-height:1.08;
-    letter-spacing:-.022em;
-    font-weight:700;
-    margin:0 0 14px;
-    text-wrap:balance;
-  }
-  h2{
-    font-size:19px;letter-spacing:-.008em;font-weight:600;
-    margin:0 0 4px;
-  }
-  h3{font-size:15px;font-weight:600;margin:0 0 6px;letter-spacing:-.004em;}
-  p{margin:0 0 14px;}
-  .eyebrow{
-    font-size:11px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
-    color:var(--ink-3);margin:0 0 10px;
-  }
-  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+<nav class="nav" id="nav" aria-label="Document contents">
+  <a class="brand" href="index.html"><b>Credit default prediction</b><span>submission documents</span></a>
+  <p class="score"><span>hidden test</span><b>0.40982</b></p>
 
-  header.top{
-    border-bottom:2px solid var(--ink);
-    padding:52px 0 26px;
-    margin-bottom:30px;
-  }
-  .sub{color:var(--ink-2);font-size:17px;margin:0;}
+  <p class="grp">Overview</p>
+  <ol>
+    <li><a class="item" href="index.html"><span class="no">·</span>Start here</a></li>
+  </ol>
 
-  /* headline figures */
-  .figures{
-    display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));
-    gap:0;border:1px solid var(--rule);background:var(--panel);
-    margin:26px 0 0;
-  }
-  .stat{padding:16px 18px;border-right:1px solid var(--rule);}
-  .stat:last-child{border-right:none;}
-  .stat span{
-    display:block;font-family:var(--sans);font-size:10.5px;font-weight:600;
-    letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);margin-bottom:7px;
-  }
-  .stat b{
-    display:block;font-family:var(--mono);font-variant-numeric:tabular-nums;
-    font-size:25px;font-weight:600;letter-spacing:-.02em;line-height:1;
-  }
-  .stat i{display:block;font-style:normal;font-size:12.5px;color:var(--ink-3);margin-top:6px;font-family:var(--sans);}
+  <p class="grp">Methodology report</p>
+  <ol>
+    <li><a class="item" href="methodology-report.html#pipeline"><span class="no">1</span>Pipeline</a></li>
+    <li><a class="item" href="methodology-report.html#components"><span class="no">2</span>The three components</a></li>
+    <li><a class="item" href="methodology-report.html#mechanics"><span class="no">3</span>How a prediction is computed</a></li>
+    <li><a class="item" href="methodology-report.html#blend"><span class="no">4</span>Combining the three</a></li>
+    <li><a class="item" href="methodology-report.html#provenance"><span class="no">5</span>How we arrived here</a></li>
+    <li><a class="item" href="methodology-report.html#assessment"><span class="no">6</span>Strengths and weaknesses</a></li>
+    <li><a class="item" href="methodology-report.html#next"><span class="no">7</span>What we would try next</a></li>
+  </ol>
 
-  section{margin:46px 0 0;}
-  .lede{color:var(--ink-2);margin-bottom:22px;}
+  <p class="grp">Experiment ledger</p>
+  <ol>
+    <li><a class="item" href="#survived"><span class="no">1</span>The changes that survived</a></li>
+    <li><a class="item" href="#ledger"><span class="no">2</span>All 41 experiments</a></li>
+    <li><a class="item" href="#patterns"><span class="no">3</span>What the record shows</a></li>
+  </ol>
 
-  /* timeline of confirmed wins */
-  .chain{border-top:1px solid var(--rule);margin-top:18px;}
-  .step{
-    display:grid;
-    grid-template-columns:34px 1fr 128px 96px;
-    gap:16px;align-items:baseline;
-    padding:14px 0 15px;border-bottom:1px solid var(--rule-soft);
-  }
-  .step .idx{
-    font-family:var(--mono);font-size:12px;color:var(--ink-3);
-    font-variant-numeric:tabular-nums;padding-top:3px;
-  }
-  .step .what strong{font-family:var(--sans);font-weight:600;font-size:15px;display:block;margin-bottom:2px;}
-  .step .what em{font-style:normal;color:var(--ink-3);font-size:13.5px;line-height:1.5;display:block;}
-  .step .score{
-    font-family:var(--mono);font-variant-numeric:tabular-nums;
-    font-size:16px;font-weight:500;text-align:right;
-  }
-  .step .delta{
-    font-family:var(--mono);font-variant-numeric:tabular-nums;
-    font-size:13px;text-align:right;
-  }
-  .up{color:var(--win);}
-  .flat{color:var(--null);}
-  .down{color:var(--loss);}
-  .step.rejected{opacity:.62;}
-  .step.rejected .what strong::after{
-    content:"reverted";font-family:var(--sans);font-size:10px;font-weight:600;
-    letter-spacing:.09em;text-transform:uppercase;color:var(--loss);
-    border:1px solid var(--loss);border-radius:2px;padding:1px 5px;margin-left:9px;
-    vertical-align:1px;
-  }
+  <p class="foot">Source<br><a href="https://github.com/dpark2380/datathon-inter-uni">github.com/dpark2380/<wbr>datathon-inter-uni</a></p>
+</nav>
 
-  /* ledger table */
-  .ledger-wrap{overflow-x:auto;border:1px solid var(--rule);background:var(--panel);}
-  table{border-collapse:collapse;width:100%;min-width:720px;}
-  caption{
-    font-family:var(--sans);font-size:12px;color:var(--ink-3);text-align:left;
-    padding:12px 16px;border-bottom:1px solid var(--rule);background:var(--panel-2);
-  }
-  th{
-    font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--ink-3);text-align:left;padding:11px 16px;border-bottom:1px solid var(--rule);
-    white-space:nowrap;
-  }
-  td{
-    padding:10px 16px;border-bottom:1px solid var(--rule-soft);
-    font-size:14px;vertical-align:top;
-  }
-  tbody tr:last-child td{border-bottom:none;}
-  td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:13px;}
-  td.why{color:var(--ink-2);font-size:13.5px;line-height:1.5;max-width:38ch;}
-  .grp td{
-    background:var(--panel-2);font-family:var(--sans);font-weight:600;font-size:11px;
-    letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);padding:9px 16px;
-  }
-
-  /* delta bar against threshold */
-  .bar{position:relative;height:16px;width:150px;min-width:150px;}
-  .bar .zero{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--rule);}
-  .bar .th{position:absolute;top:-1px;bottom:-1px;width:1px;background:var(--thresh);opacity:.85;}
-  .bar .fill{position:absolute;top:4px;height:8px;border-radius:1px;}
-  .bar .fill.pos{background:var(--win);}
-  .bar .fill.neg{background:var(--loss);}
-  .bar .fill.nil{background:var(--null);}
-
-  .legend{
-    display:flex;flex-wrap:wrap;gap:18px;align-items:center;
-    font-family:var(--sans);font-size:12px;color:var(--ink-3);
-    padding:12px 16px;border-top:1px solid var(--rule);background:var(--panel-2);
-  }
-  .key{display:inline-flex;align-items:center;gap:7px;}
-  .swatch{width:14px;height:8px;border-radius:1px;display:inline-block;}
-  .tick{width:2px;height:13px;background:var(--thresh);display:inline-block;}
-
-  /* findings */
-  .findings{display:grid;gap:0;border:1px solid var(--rule);background:var(--panel);}
-  .finding{padding:18px 20px;border-bottom:1px solid var(--rule-soft);}
-  .finding:last-child{border-bottom:none;}
-  .finding p{margin:0;color:var(--ink-2);font-size:14.5px;}
-  .finding h3{color:var(--ink);}
-  .finding .ev{
-    font-family:var(--mono);font-size:12px;color:var(--ink-3);
-    margin-top:8px;display:block;font-variant-numeric:tabular-nums;
-  }
-
-  .note{
-    border-left:2px solid var(--thresh);
-    padding:2px 0 2px 18px;margin:20px 0;
-    color:var(--ink-2);font-size:14.5px;
-  }
-  .note strong{font-family:var(--sans);color:var(--ink);}
-
-  footer{
-    margin-top:52px;padding-top:18px;border-top:1px solid var(--rule);
-    font-family:var(--sans);font-size:12.5px;color:var(--ink-3);
-  }
-  a{color:var(--win);}
-  @media (max-width:640px){
-    .step{grid-template-columns:26px 1fr;row-gap:4px;}
-    .step .score,.step .delta{text-align:left;}
-  }
-</style>
-
+<main class="page">
 <div class="wrap">
-<header class="top">
-  <p class="eyebrow">Credit default prediction &middot; experiment record</p>
-  <h1>Every model we tried, and what it actually bought</h1>
-  <p class="sub measure">Forty-one experiments against a binary log&nbsp;loss target, scored on 24,000 labelled customers and a 6,000-row hidden test set. One feature family and one architecture produced nearly all of the gain; everything else is recorded here because knowing what does <em>not</em> work on this data is most of the result.</p>
 
-  <div class="figures">
-    <div class="stat"><span>Best score</span><b>0.40982</b><i>hidden test log loss</i></div>
-    <div class="stat"><span>Opening score</span><b>0.41260</b><i>first submission</i></div>
-    <div class="stat"><span>Gap to first place</span><b>0.00015</b><i>leader at 0.40967</i></div>
-    <div class="stat"><span>Experiments</span><b>41</b><i>4 helped, 37 did not</i></div>
+<header class="top">
+  <p class="kicker">Credit default prediction · experiment record</p>
+  <h1>Every model we tried, and what it actually bought</h1>
+  <p class="sub measure">Forty-one experiments against a binary log loss target, scored on 24,000 labelled customers and a 6,000-row hidden test set. One feature family and one architecture produced nearly all of the gain; everything else is recorded here because knowing what does not work on this data is most of the result.</p>
+
+  <div class="stmt">
+    <table>
+      <caption>Hidden-test log loss. Lower is better.</caption>
+      <tbody>
+        <tr><td>Opening score<span class="qual">first submission</span></td><td>0.41260</td></tr>
+        <tr><td>Best score<span class="qual">final submission</span></td><td>0.40982</td></tr>
+        <tr class="total"><td>Total gained<span class="qual">over nine submissions</span></td><td>0.00278</td></tr>
+        <tr class="final"><td>Gap to first place<span class="qual">leader at 0.40967</span></td><td>0.00015</td></tr>
+      </tbody>
+    </table>
   </div>
 </header>
 
-<section>
-  <p class="eyebrow">Part one</p>
-  <h2>The changes that survived</h2>
+<section id="survived">
+  <div class="sechead"><span class="no">1</span><h2>The changes that survived</h2></div>
   <p class="lede measure">Each row is a submission to the hidden test set, in order. This is a genuine sequence &mdash; every step builds on the one above it, so the numbering carries information.</p>
 
-  <div class="chain">
-    <div class="step">
-      <div class="idx">01</div>
-      <div class="what">
-        <strong>Log&nbsp;loss alignment + sequence model</strong>
-        <em>Model selection and blend weights switched from AUC to log&nbsp;loss, and a GRU added that reads the six-month payment panel in order rather than as flattened summary statistics.</em>
-      </div>
-      <div class="score">0.41260</div>
-      <div class="delta flat">baseline</div>
-    </div>
+  <figure>
+    <svg class="chart" viewBox="0 0 740 240" role="img" aria-labelledby="subs-title">
+      <title id="subs-title">Hidden-test log loss across nine submissions, falling from 0.41260 at step 01 to 0.40982 at step 09, with one regression at step 06.</title>
+      <line x1="44" y1="186.4" x2="700" y2="186.4" stroke="var(--amber)" stroke-width="1" stroke-dasharray="3 3"/>
+      <text x="48" y="181" font-size="10.5">leader 0.40967</text>
+      <polyline points="44,34.4 126,46.3 208,59.8 290,59.8 372,149.5 454,146.4 536,152.7 618,171.8 700,178.6"
+                fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-linejoin="round"/>
+      <circle cx="44"  cy="34.4"  r="3.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/>
+      <circle cx="126" cy="46.3"  r="3.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/>
+      <circle cx="208" cy="59.8"  r="3.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/>
+      <circle cx="290" cy="59.8"  r="3.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/>
+      <circle cx="372" cy="149.5" r="4.5" fill="var(--lgbm)" stroke="var(--paper)" stroke-width="1.5"/>
+      <circle cx="454" cy="146.4" r="4.5" fill="var(--red)"  stroke="var(--paper)" stroke-width="1.5"/>
+      <circle cx="536" cy="152.7" r="3.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/>
+      <circle cx="618" cy="171.8" r="3.5" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/>
+      <circle cx="700" cy="178.6" r="4.5" fill="var(--ink)"  stroke="var(--paper)" stroke-width="1.5"/>
+      <text x="318" y="126" text-anchor="end" font-size="11.5" class="lab">spending decomposition</text>
+      <text x="318" y="142" text-anchor="end" font-size="11.5" class="lab">&minus;0.00173, the largest gain</text>
+      <text x="454" y="130" text-anchor="middle" font-size="10.5" fill="var(--red)">reverted</text>
+      <line x1="44" y1="202" x2="700" y2="202" stroke="var(--rule)"/>
+      <text x="44"  y="218" text-anchor="middle" font-size="11">01</text>
+      <text x="126" y="218" text-anchor="middle" font-size="11">02</text>
+      <text x="208" y="218" text-anchor="middle" font-size="11">03</text>
+      <text x="290" y="218" text-anchor="middle" font-size="11">04</text>
+      <text x="372" y="218" text-anchor="middle" font-size="11">05</text>
+      <text x="454" y="218" text-anchor="middle" font-size="11">06</text>
+      <text x="536" y="218" text-anchor="middle" font-size="11">07</text>
+      <text x="618" y="218" text-anchor="middle" font-size="11">08</text>
+      <text x="700" y="218" text-anchor="middle" font-size="11">09</text>
+      <text x="44"  y="234" text-anchor="middle" font-size="11" class="lab">0.41260</text>
+      <text x="700" y="234" text-anchor="middle" font-size="11" class="lab">0.40982</text>
+    </svg>
+    <figcaption><b>Nine submissions, one reverted.</b> Step 05 &mdash; recovering monthly spending from the accounting identity &mdash; is worth more than the other eight combined. Step 06 is the only move that went the wrong way, and it was taken back.</figcaption>
+  </figure>
 
-    <div class="step">
-      <div class="idx">02</div>
-      <div class="what">
-        <strong>Full-data refit for the GRU</strong>
-        <em>Test predictions became half fold-ensemble, half a model refit on all 24k rows at the CV-average best epoch. Invisible to cross-validation by construction &mdash; OOF only ever sees 80%-data fold models.</em>
-      </div>
-      <div class="score">0.41237</div>
-      <div class="delta up">&minus;0.00023</div>
-    </div>
-
-    <div class="step">
-      <div class="idx">03</div>
-      <div class="what">
-        <strong>Repeated cross-validation, three partitions</strong>
-        <em>Both models retrained over three different fold splits. Each test row went from being predicted by 15 models to 45.</em>
-      </div>
-      <div class="score">0.41211</div>
-      <div class="delta up">&minus;0.00026</div>
-    </div>
-
-    <div class="step">
-      <div class="idx">04</div>
-      <div class="what">
-        <strong>Repeated cross-validation, six partitions</strong>
-        <em>Doubled again to 90 LightGBM and 150 GRU models. Improved OOF by 0.00024 and the leaderboard by nothing &mdash; the point where averaging saturates.</em>
-      </div>
-      <div class="score">0.41211</div>
-      <div class="delta flat">0.00000</div>
-    </div>
-
-    <div class="step">
-      <div class="idx">05</div>
-      <div class="what">
-        <strong>Spending decomposition + tuned GRU</strong>
-        <em>Recovered monthly spending from the accounting identity, and retuned the GRU's architecture for the first time. The largest single gain of the project.</em>
-      </div>
-      <div class="score">0.41038</div>
-      <div class="delta up">&minus;0.00173</div>
-    </div>
-
-    <div class="step rejected">
-      <div class="idx">06</div>
-      <div class="what">
-        <strong>Survival / hazard model in the blend</strong>
-        <em>Window-rolling augmentation earned a third of the blend weight and 0.00027 on OOF &mdash; the first model in seven challenger families to earn any weight at all. The leaderboard disagreed.</em>
-      </div>
-      <div class="score">0.41044</div>
-      <div class="delta down">+0.00006</div>
-    </div>
-
-    <div class="step">
-      <div class="idx">07</div>
-      <div class="what">
-        <strong>Pure full-data refit for LightGBM</strong>
-        <em>Dropped the fold-ensemble half entirely. Small enough to be noise, kept because it is the principled direction and measurably not worse.</em>
-      </div>
-      <div class="score">0.41032</div>
-      <div class="delta up">&minus;0.00006</div>
-    </div>
-
-    <div class="step">
-      <div class="idx">08</div>
-      <div class="what">
-        <strong>TabPFN added to the blend</strong>
-        <em>A transformer pretrained on synthetic tabular tasks, run over the same 81 features. A third inductive bias &mdash; a learned prior rather than a fitted model &mdash; and the first challenger family to hold weight on the leaderboard as well as OOF.</em>
-      </div>
-      <div class="score">0.40995</div>
-      <div class="delta up">&minus;0.00037</div>
-    </div>
-
-    <div class="step">
-      <div class="idx">09</div>
-      <div class="what">
-        <strong>TabPFN raised to six partitions + full-data refit</strong>
-        <em>The same treatment already given to the other two components: six fold partitions instead of three, plus a refit on all 24k rows. Final submission.</em>
-      </div>
-      <div class="score">0.40982</div>
-      <div class="delta up">&minus;0.00013</div>
-    </div>
+  <div class="tbl-wrap">
+  <table class="data">
+    <thead>
+      <tr><th scope="col">#</th><th scope="col">Change</th><th scope="col" class="n">Score</th><th scope="col" class="n">Gain</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="n">01</td>
+        <td><b>Log loss alignment + sequence model</b><br><span class="why">Model selection and blend weights switched from AUC to log loss, and a GRU added that reads the six-month payment panel in order rather than as flattened summary statistics.</span></td>
+        <td class="n">0.41260</td><td class="n flat">baseline</td>
+      </tr>
+      <tr>
+        <td class="n">02</td>
+        <td><b>Full-data refit for the GRU</b><br><span class="why">Test predictions became half fold-ensemble, half a model refit on all 24k rows at the CV-average best epoch. Invisible to cross-validation by construction &mdash; OOF only ever sees 80%-data fold models.</span></td>
+        <td class="n">0.41237</td><td class="n up">&minus;0.00023</td>
+      </tr>
+      <tr>
+        <td class="n">03</td>
+        <td><b>Repeated cross-validation, three partitions</b><br><span class="why">Both models retrained over three different fold splits. Each test row went from being predicted by 15 models to 45.</span></td>
+        <td class="n">0.41211</td><td class="n up">&minus;0.00026</td>
+      </tr>
+      <tr>
+        <td class="n">04</td>
+        <td><b>Repeated cross-validation, six partitions</b><br><span class="why">Doubled again to 90 LightGBM and 150 GRU models. Improved OOF by 0.00024 and the leaderboard by nothing &mdash; the point where averaging saturates.</span></td>
+        <td class="n">0.41211</td><td class="n flat">0.00000</td>
+      </tr>
+      <tr class="hl">
+        <td class="n">05</td>
+        <td><b>Spending decomposition + tuned GRU</b><br><span class="why">Recovered monthly spending from the accounting identity, and retuned the GRU&rsquo;s architecture for the first time. The largest single gain of the project.</span></td>
+        <td class="n">0.41038</td><td class="n up">&minus;0.00173</td>
+      </tr>
+      <tr>
+        <td class="n">06</td>
+        <td><b>Survival / hazard model in the blend</b><br><span class="why">Window-rolling augmentation earned a third of the blend weight and 0.00027 on OOF &mdash; the first model in seven challenger families to earn any weight at all. The leaderboard disagreed.</span></td>
+        <td class="n">0.41044</td><td class="n down">+0.00006</td>
+      </tr>
+      <tr>
+        <td class="n">07</td>
+        <td><b>Pure full-data refit for LightGBM</b><br><span class="why">Dropped the fold-ensemble half entirely. Small enough to be noise, kept because it is the principled direction and measurably not worse.</span></td>
+        <td class="n">0.41032</td><td class="n up">&minus;0.00006</td>
+      </tr>
+      <tr>
+        <td class="n">08</td>
+        <td><b>TabPFN added to the blend</b><br><span class="why">A transformer pretrained on synthetic tabular tasks, run over the same 81 features. A third inductive bias &mdash; a learned prior rather than a fitted model &mdash; and the first challenger family to hold weight on the leaderboard as well as OOF.</span></td>
+        <td class="n">0.40995</td><td class="n up">&minus;0.00037</td>
+      </tr>
+      <tr>
+        <td class="n">09</td>
+        <td><b>TabPFN raised to six partitions + full-data refit</b><br><span class="why">The same treatment already given to the other two components: six fold partitions instead of three, plus a refit on all 24k rows. Final submission.</span></td>
+        <td class="n">0.40982</td><td class="n up">&minus;0.00013</td>
+      </tr>
+    </tbody>
+  </table>
   </div>
 </section>
 
-<section>
-  <p class="eyebrow">Part two</p>
-  <h2>The full ledger</h2>
+<section id="ledger">
+  <div class="sechead"><span class="no">2</span><h2>The full ledger</h2></div>
   <p class="lede measure">Every experiment measured on out-of-fold log&nbsp;loss across the same 24,000 rows and the same fold splits. The amber line marks 0.0005 &mdash; the fold-noise threshold below which a result is not distinguishable from chance on this dataset.</p>
 
-  <div class="ledger-wrap">
-    <table>
-      <caption>Delta is the improvement in OOF log loss. Positive is better; bars are drawn to a common scale and clipped at &plusmn;0.0010.</caption>
-      <thead>
-        <tr>
-          <th>Experiment</th>
-          <th>Delta</th>
-          <th style="width:160px;">vs. noise floor</th>
-          <th>Why it did or didn't work</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr class="grp"><td colspan="4">Features &mdash; 7 tried, 1 worked</td></tr>
-        <tr>
-          <td>Spending decomposition</td>
-          <td class="n up">+0.00046</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill pos" style="left:50%;width:69px;"></span></div></td>
-          <td class="why">Recovered a quantity genuinely absent from the data. Balances and payments are given; the amount <em>charged</em> each month is not, but the accounting identity yields it. A rising balance from spending is a different risk story from one caused by non-payment.</td>
-        </tr>
-        <tr>
-          <td>Behavioural payment signatures</td>
-          <td class="n flat">+0.00006</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill nil" style="left:50%;width:9px;"></span></div></td>
-          <td class="why">Round-number payments, exact-balance clearing, repeated fixed amounts. Plausible as intent signals, but the model extracted nothing beyond what payment ratios already carried.</td>
-        </tr>
-        <tr>
-          <td>Spending as a GRU sequence channel</td>
-          <td class="n flat">+0.00002</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill nil" style="left:50%;width:3px;"></span></div></td>
-          <td class="why">Fed the one feature family that worked to the one architecture that worked, as an ordered trajectory rather than flattened summaries. Against a matched control it changed nothing &mdash; the GRU already received spending as static features, so this tested only whether the <em>ordering</em> added anything beyond the information itself. It did not.</td>
-        </tr>
-        <tr>
-          <td>Interaction terms</td>
-          <td class="n flat">0.00000</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill nil" style="left:50%;width:2px;"></span></div></td>
-          <td class="why">Products of existing columns. Gradient-boosted trees already discover two-way interactions through sequential splits, so these were redundant by construction &mdash; none reached the top-15 importances.</td>
-        </tr>
-        <tr>
-          <td>Peer-relative credit limit</td>
-          <td class="n down">&minus;0.00011</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 16px);width:16px;"></span></div></td>
-          <td class="why">The theory was sound &mdash; a credit limit encodes the issuer's private assessment from income and bureau data we never see. But the raw limit is already a feature, and demographic peer cells were too coarse to add position information.</td>
-        </tr>
-        <tr>
-          <td>Velocity &amp; acceleration</td>
-          <td class="n down">&minus;0.00024</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 33px);width:33px;"></span></div></td>
-          <td class="why">Twenty-four derivative columns of the balance and payment paths. The GRU exploits trajectory shape natively; handing the same information to trees as explicit derivatives added noise instead.</td>
-        </tr>
-        <tr>
-          <td>Target encoding</td>
-          <td class="n down">&minus;0.00052</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 72px);width:72px;"></span></div></td>
-          <td class="why">Payment-sequence tokens and demographic cells, nested inside folds to avoid leakage. 1,028 distinct sequence tokens over 24,000 rows &mdash; roughly 23 rows each, too sparse to estimate reliably.</td>
-        </tr>
+  <div class="tbl-wrap">
+  <table class="data ledger">
+    <caption>Delta is the improvement in OOF log loss. Positive is better; bars are drawn to a common scale and clipped at &plusmn;0.0010.</caption>
+    <thead>
+      <tr><th scope="col">Experiment</th><th scope="col" class="n">Delta</th><th scope="col" style="width:180px;">vs. noise floor</th><th scope="col">Why it did or didn&rsquo;t work</th></tr>
+    </thead>
+    <tbody>
 
-        <tr class="grp"><td colspan="4">Model families &mdash; 10 tried, 3 kept, 7 challengers rejected</td></tr>
-        <tr>
-          <td>GRU sequence model</td>
-          <td class="n up">+0.00042</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill pos" style="left:50%;width:63px;"></span></div></td>
-          <td class="why">The one architecture that worked. Two customers each late twice &mdash; one recovering, one deteriorating &mdash; have identical <span class="mono">n_late</span> and <span class="mono">pay_max</span>. Reading months in order separates them. Took 35&ndash;40% of the blend and evicted the MLP entirely.</td>
-        </tr>
-        <tr>
-          <td>Survival / hazard framing</td>
-          <td class="n up">+0.00027</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill pos" style="left:50%;width:38px;"></span></div></td>
-          <td class="why">Rolled the window back to create extra training rows. Earned a third of the blend, but the effect was decorrelation rather than accuracy, and the gain vanished on the hidden test set.</td>
-        </tr>
-        <tr>
-          <td>1D convolutional net</td>
-          <td class="n flat">+0.00005</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill nil" style="left:50%;width:7px;"></span></div></td>
-          <td class="why">A second reader of the same panel. Correlated 0.9924 with the GRU &mdash; different architecture, identical signal. It split the sequence weight rather than adding to it.</td>
-        </tr>
-        <tr>
-          <td>CatBoost</td>
-          <td class="n flat">0.00000</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill nil" style="left:50%;width:2px;"></span></div></td>
-          <td class="why">Chosen for ordered boosting's calibration properties, not for accuracy. Correlated 0.9930 with LightGBM &mdash; more than the MLP did. Weight&nbsp;0.</td>
-        </tr>
-        <tr>
-          <td>Autoencoder classifier</td>
-          <td class="n flat">0.00000</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill nil" style="left:50%;width:2px;"></span></div></td>
-          <td class="why">Reconstruction loss was a straight cost: the harder the latent worked to reconstruct, the worse it classified. Weight&nbsp;0.</td>
-        </tr>
-        <tr>
-          <td>ExtraTrees</td>
-          <td class="n flat">0.00000</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill nil" style="left:50%;width:2px;"></span></div></td>
-          <td class="why">Bagging rather than boosting, for a different variance profile. Weight&nbsp;0.</td>
-        </tr>
-        <tr>
-          <td>Logistic regression</td>
-          <td class="n flat">0.00000</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill nil" style="left:50%;width:2px;"></span></div></td>
-          <td class="why">The most decorrelated model produced all session at 0.9483 &mdash; and still weight&nbsp;0. Decisive evidence that decorrelation alone buys nothing; the errors must also be <em>useful</em>.</td>
-        </tr>
-        <tr>
-          <td>Multi-task GRU</td>
-          <td class="n flat">0.00000</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill nil" style="left:50%;width:2px;"></span></div></td>
-          <td class="why">Auxiliary next-month forecasting head. Flat across three orders of auxiliary weight &mdash; next month's balance is near-deterministic from the prior month, so the auxiliary gradient carried nothing new.</td>
-        </tr>
+      <tr class="grp"><td colspan="4">Features &mdash; 7 tried, 1 worked</td></tr>
+      <tr class="row"><td class="exp">Spending decomposition</td><td class="n up">+0.00046</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill pos" style="--d:0.00046"></span></div></td>
+        <td class="why">Recovered a quantity genuinely absent from the data. Balances and payments are given; the amount <em>charged</em> each month is not, but the accounting identity yields it. A rising balance from spending is a different risk story from one caused by non-payment.</td></tr>
+      <tr class="row band"><td class="exp">Behavioural payment signatures</td><td class="n flat">+0.00006</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill nil" style="--d:0.00006"></span></div></td>
+        <td class="why">Round-number payments, exact-balance clearing, repeated fixed amounts. Plausible as intent signals, but the model extracted nothing beyond what payment ratios already carried.</td></tr>
+      <tr class="row"><td class="exp">Spending as a GRU sequence channel</td><td class="n flat">+0.00002</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill nil" style="--d:0.00002"></span></div></td>
+        <td class="why">Fed the one feature family that worked to the one architecture that worked, as an ordered trajectory rather than flattened summaries. Against a matched control it changed nothing &mdash; the GRU already received spending as static features, so this tested only whether the <em>ordering</em> added anything beyond the information itself. It did not.</td></tr>
+      <tr class="row band"><td class="exp">Interaction terms</td><td class="n flat">0.00000</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span></div></td>
+        <td class="why">Products of existing columns. Gradient-boosted trees already discover two-way interactions through sequential splits, so these were redundant by construction &mdash; none reached the top-15 importances.</td></tr>
+      <tr class="row"><td class="exp">Peer-relative credit limit</td><td class="n down">&minus;0.00011</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00011"></span></div></td>
+        <td class="why">The theory was sound &mdash; a credit limit encodes the issuer&rsquo;s private assessment from income and bureau data we never see. But the raw limit is already a feature, and demographic peer cells were too coarse to add position information.</td></tr>
+      <tr class="row band"><td class="exp">Velocity &amp; acceleration</td><td class="n down">&minus;0.00024</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00024"></span></div></td>
+        <td class="why">Twenty-four derivative columns of the balance and payment paths. The GRU exploits trajectory shape natively; handing the same information to trees as explicit derivatives added noise instead.</td></tr>
+      <tr class="row"><td class="exp">Target encoding</td><td class="n down">&minus;0.00052</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00052"></span></div></td>
+        <td class="why">Payment-sequence tokens and demographic cells, nested inside folds to avoid leakage. 1,028 distinct sequence tokens over 24,000 rows &mdash; roughly 23 rows each, too sparse to estimate reliably.</td></tr>
 
-        <tr class="grp"><td colspan="4">Tuning &mdash; 135 configurations, incumbent never beaten</td></tr>
-        <tr>
-          <td>LightGBM sweep, 40 coarse configs</td>
-          <td class="n flat">0.00000</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill nil" style="left:50%;width:2px;"></span></div></td>
-          <td class="why">Retuned for log&nbsp;loss after the metric switch. All 40 candidates scored worse than the incumbent, which had been tuned against AUC &mdash; regularisation that prevents overfitting helps both metrics together.</td>
-        </tr>
-        <tr>
-          <td>LightGBM sweep, 60 fine configs</td>
-          <td class="n flat">0.00000</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill nil" style="left:50%;width:2px;"></span></div></td>
-          <td class="why">Local refinement plus four dimensions the first sweep never touched. Best found was 0.00004 better &mdash; twelve times below the noise floor.</td>
-        </tr>
-        <tr>
-          <td>LightGBM sweep, blend objective</td>
-          <td class="n flat">0.00000</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill nil" style="left:50%;width:2px;"></span></div></td>
-          <td class="why">Scored by blend rather than solo log&nbsp;loss, on the theory that the best partner differs from the best standalone model. The incumbent won on both objectives.</td>
-        </tr>
-        <tr>
-          <td>GRU architecture sweep</td>
-          <td class="n up">&mdash;</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill pos" style="left:50%;width:40px;"></span></div></td>
-          <td class="why">The one model never tuned. Smaller hidden state, two layers, heavier dropout and a faster learning rate beat the hand-picked defaults &mdash; the same lesson LightGBM taught. Bundled with the spending features, so not independently isolated.</td>
-        </tr>
+      <tr class="grp"><td colspan="4">Model families &mdash; 10 tried, 3 kept, 7 challengers rejected</td></tr>
+      <tr class="row"><td class="exp">GRU sequence model</td><td class="n up">+0.00042</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill pos" style="--d:0.00042"></span></div></td>
+        <td class="why">The one architecture that worked. Two customers each late twice &mdash; one recovering, one deteriorating &mdash; have identical <code>n_late</code> and <code>pay_max</code>. Reading months in order separates them. Took 35&ndash;40% of the blend and evicted the MLP entirely.</td></tr>
+      <tr class="row band"><td class="exp">Survival / hazard framing</td><td class="n up">+0.00027</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill pos" style="--d:0.00027"></span></div></td>
+        <td class="why">Rolled the window back to create extra training rows. Earned a third of the blend, but the effect was decorrelation rather than accuracy, and the gain vanished on the hidden test set.</td></tr>
+      <tr class="row"><td class="exp">1D convolutional net</td><td class="n flat">+0.00005</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill nil" style="--d:0.00005"></span></div></td>
+        <td class="why">A second reader of the same panel. Correlated 0.9924 with the GRU &mdash; different architecture, identical signal. It split the sequence weight rather than adding to it.</td></tr>
+      <tr class="row band"><td class="exp">CatBoost</td><td class="n flat">0.00000</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span></div></td>
+        <td class="why">Chosen for ordered boosting&rsquo;s calibration properties, not for accuracy. Correlated 0.9930 with LightGBM &mdash; more than the MLP did. Weight 0.</td></tr>
+      <tr class="row"><td class="exp">Autoencoder classifier</td><td class="n flat">0.00000</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span></div></td>
+        <td class="why">Reconstruction loss was a straight cost: the harder the latent worked to reconstruct, the worse it classified. Weight 0.</td></tr>
+      <tr class="row band"><td class="exp">ExtraTrees</td><td class="n flat">0.00000</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span></div></td>
+        <td class="why">Bagging rather than boosting, for a different variance profile. Weight 0.</td></tr>
+      <tr class="row"><td class="exp">Logistic regression</td><td class="n flat">0.00000</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span></div></td>
+        <td class="why">The most decorrelated model produced all session at 0.9483 &mdash; and still weight 0. Decisive evidence that decorrelation alone buys nothing; the errors must also be <em>useful</em>.</td></tr>
+      <tr class="row band"><td class="exp">Multi-task GRU</td><td class="n flat">0.00000</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span></div></td>
+        <td class="why">Auxiliary next-month forecasting head. Flat across three orders of auxiliary weight &mdash; next month&rsquo;s balance is near-deterministic from the prior month, so the auxiliary gradient carried nothing new.</td></tr>
 
-        <tr class="grp"><td colspan="4">Ensembling &amp; calibration &mdash; 8 tried, 0 beat a plain weighted average</td></tr>
-        <tr>
-          <td>Log-odds averaging</td>
-          <td class="n down">&minus;0.00012</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 17px);width:17px;"></span></div></td>
-          <td class="why">Averaging in logit space rather than probability space &mdash; the space log&nbsp;loss operates in. Worse.</td>
-        </tr>
-        <tr>
-          <td>Logistic-regression stacking</td>
-          <td class="n down">&minus;0.00023</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 32px);width:32px;"></span></div></td>
-          <td class="why">Learns weights and a recalibration slope jointly &mdash; strictly more general than a fixed convex weight, and strictly worse in practice.</td>
-        </tr>
-        <tr>
-          <td>Hill-climbing ensemble selection</td>
-          <td class="n down">&minus;0.00007</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 10px);width:10px;"></span></div></td>
-          <td class="why">Greedy selection with replacement over all four models. Landed within noise of the simple weight grid.</td>
-        </tr>
-        <tr>
-          <td>Feature-aware meta-model</td>
-          <td class="n down">&minus;0.00208</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 74px);width:74px;"></span></div></td>
-          <td class="why">A LightGBM meta-model over base predictions plus features, to learn <em>which model to trust for which customer</em>. The largest regression of any experiment. That per-customer trust structure simply isn't there to learn.</td>
-        </tr>
-        <tr>
-          <td>Isotonic recalibration</td>
-          <td class="n down">&minus;0.00330</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 74px);width:74px;"></span></div></td>
-          <td class="why">Flexible enough to overfit the very rows it was scored on &mdash; it first appeared to be a large win. Under honest nested CV it was the worst result recorded.</td>
-        </tr>
-        <tr>
-          <td>Platt scaling</td>
-          <td class="n down">&minus;0.00005</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 7px);width:7px;"></span></div></td>
-          <td class="why">Two-parameter sigmoid fit. Essentially a no-op: the models are already well calibrated, confirmed independently by the reliability diagram.</td>
-        </tr>
-        <tr>
-          <td>Per-segment calibration</td>
-          <td class="n down">&minus;0.00030</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 42px);width:42px;"></span></div></td>
-          <td class="why">Separate curves by credit-limit quartile and lateness count, since residuals vary sharply across those segments. The heterogeneity is real; correctable miscalibration inside it is not.</td>
-        </tr>
-        <tr>
-          <td>Base-rate shrinkage</td>
-          <td class="n flat">0.00000</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill nil" style="left:50%;width:2px;"></span></div></td>
-          <td class="why">A one-parameter pull toward the 22.12% base rate. The search selected &alpha;&nbsp;=&nbsp;1.0 &mdash; "do not shrink at all" &mdash; a third independent confirmation that confidence was already correct.</td>
-        </tr>
+      <tr class="grp"><td colspan="4">Tuning &mdash; 135 configurations, incumbent never beaten</td></tr>
+      <tr class="row"><td class="exp">LightGBM sweep, 40 coarse configs</td><td class="n flat">0.00000</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span></div></td>
+        <td class="why">Retuned for log loss after the metric switch. All 40 candidates scored worse than the incumbent, which had been tuned against AUC &mdash; regularisation that prevents overfitting helps both metrics together.</td></tr>
+      <tr class="row band"><td class="exp">LightGBM sweep, 60 fine configs</td><td class="n flat">0.00000</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span></div></td>
+        <td class="why">Local refinement plus four dimensions the first sweep never touched. Best found was 0.00004 better &mdash; twelve times below the noise floor.</td></tr>
+      <tr class="row"><td class="exp">LightGBM sweep, blend objective</td><td class="n flat">0.00000</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span></div></td>
+        <td class="why">Scored by blend rather than solo log loss, on the theory that the best partner differs from the best standalone model. The incumbent won on both objectives.</td></tr>
+      <tr class="row band"><td class="exp">GRU architecture sweep</td><td class="n flat">&mdash;</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span></div></td>
+        <td class="why">The one model never tuned. Smaller hidden state, two layers, heavier dropout and a faster learning rate beat the hand-picked defaults &mdash; the same lesson LightGBM taught. Bundled with the spending features, so not independently isolated.</td></tr>
 
-        <tr class="grp"><td colspan="4">Borrowed from the AMEX 1st/2nd/3rd place solutions &mdash; 5 tried, 0 transferred</td></tr>
-        <tr>
-          <td>Recency windows &amp; within-customer ranks</td>
-          <td class="n down">&minus;0.00035</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 48px);width:48px;"></span></div></td>
-          <td class="why">Last-3-month aggregates, last-3-vs-prior-3 contrasts, and rank-within-own-history. A real gap in our set &mdash; every aggregate we own spans all six months &mdash; but re-summarising information the model already had made it worse.</td>
-        </tr>
-        <tr>
-          <td>Very high <span class="mono">min_data_in_leaf</span></td>
-          <td class="n down">&minus;0.00104</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 74px);width:74px;"></span></div></td>
-          <td class="why">Credited as their main CV/leaderboard alignment lever at 2<sup>11</sup>. Degraded monotonically for us &mdash; because 2048 of their 458,913 rows is 0.45% per leaf, and our incumbent's 100 of 24,000 is 0.42%. We were already at their setting, stated as a ratio rather than a count.</td>
-        </tr>
-        <tr>
-          <td>DART boosting</td>
-          <td class="n down">&minus;0.00072</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 74px);width:74px;"></span></div></td>
-          <td class="why">Their single best model, and explicitly against their own prior expectation. DART's benefit comes from having a long ensemble to drop trees from; at 19&times; fewer rows there is less ensemble to spare.</td>
-        </tr>
-        <tr>
-          <td><span class="mono">feature_fraction_bynode</span></td>
-          <td class="n down">&minus;0.00011</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 16px);width:16px;"></span></div></td>
-          <td class="why">Per-split rather than per-tree feature sampling. Neutral-to-slightly-negative at both values tested.</td>
-        </tr>
-        <tr>
-          <td>Denoising &amp; rank blending</td>
-          <td class="n flat">n/a</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span></div></td>
-          <td class="why">Not applicable rather than unsuccessful. Their <span class="mono">floor(x*100)/100</span> recovers noise AMEX injected into float columns &mdash; ours are already integers. Rank blending optimises a rank-based metric; ranks discard calibration, which is precisely what log&nbsp;loss scores.</td>
-        </tr>
+      <tr class="grp"><td colspan="4">Ensembling &amp; calibration &mdash; 8 tried, 0 beat a plain weighted average</td></tr>
+      <tr class="row"><td class="exp">Log-odds averaging</td><td class="n down">&minus;0.00012</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00012"></span></div></td>
+        <td class="why">Averaging in logit space rather than probability space &mdash; the space log loss operates in. Worse.</td></tr>
+      <tr class="row band"><td class="exp">Logistic-regression stacking</td><td class="n down">&minus;0.00023</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00023"></span></div></td>
+        <td class="why">Learns weights and a recalibration slope jointly &mdash; strictly more general than a fixed convex weight, and strictly worse in practice.</td></tr>
+      <tr class="row"><td class="exp">Hill-climbing ensemble selection</td><td class="n down">&minus;0.00007</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00007"></span></div></td>
+        <td class="why">Greedy selection with replacement over all four models. Landed within noise of the simple weight grid.</td></tr>
+      <tr class="row band"><td class="exp">Feature-aware meta-model</td><td class="n down">&minus;0.00208</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00208"></span></div></td>
+        <td class="why">A LightGBM meta-model over base predictions plus features, to learn <em>which model to trust for which customer</em>. The largest regression of any experiment. That per-customer trust structure simply isn&rsquo;t there to learn.</td></tr>
+      <tr class="row"><td class="exp">Isotonic recalibration</td><td class="n down">&minus;0.00330</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00330"></span></div></td>
+        <td class="why">Flexible enough to overfit the very rows it was scored on &mdash; it first appeared to be a large win. Under honest nested CV it was the worst result recorded.</td></tr>
+      <tr class="row band"><td class="exp">Platt scaling</td><td class="n down">&minus;0.00005</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00005"></span></div></td>
+        <td class="why">Two-parameter sigmoid fit. Essentially a no-op: the models are already well calibrated, confirmed independently by the reliability diagram.</td></tr>
+      <tr class="row"><td class="exp">Per-segment calibration</td><td class="n down">&minus;0.00030</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00030"></span></div></td>
+        <td class="why">Separate curves by credit-limit quartile and lateness count, since residuals vary sharply across those segments. The heterogeneity is real; correctable miscalibration inside it is not.</td></tr>
+      <tr class="row band"><td class="exp">Base-rate shrinkage</td><td class="n flat">0.00000</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span></div></td>
+        <td class="why">A one-parameter pull toward the 22.12% base rate. The search selected &alpha; = 1.0 &mdash; &ldquo;do not shrink at all&rdquo; &mdash; a third independent confirmation that confidence was already correct.</td></tr>
 
-        <tr class="grp"><td colspan="4">Structure &mdash; 3 splits tried, 0 helped</td></tr>
-        <tr>
-          <td>Segment models &mdash; by lateness</td>
-          <td class="n down">&minus;0.00225</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 74px);width:74px;"></span></div></td>
-          <td class="why">Separate models for never-late / 1&ndash;2 / 3+ late months, where residual loss ranges 0.34 to 0.64. Each model early-stops on its own inner split, so small segments are not penalised for their size.</td>
-        </tr>
-        <tr>
-          <td>Segment models &mdash; by credit limit</td>
-          <td class="n down">&minus;0.00134</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 74px);width:74px;"></span></div></td>
-          <td class="why">The cleanest of the three: two nearly equal halves (12,223 / 11,777), so almost no data-size penalty to explain it away &mdash; and it still loses. The feature-to-risk relationship is shared across these populations; splitting only discards training rows.</td>
-        </tr>
-        <tr>
-          <td>Segment models &mdash; by card usage</td>
-          <td class="n flat">&minus;0.00007</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill nil" style="left:calc(50% - 10px);width:10px;"></span></div></td>
-          <td class="why">Never-used cards (1,716 customers) modelled apart from active ones. Exactly neutral.</td>
-        </tr>
-        <tr>
-          <td>Blend weight shrinkage</td>
-          <td class="n down">&minus;0.00002</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 3px);width:3px;"></span></div></td>
-          <td class="why">Pulling the fitted 0.65/0.35 halfway to uniform, as insurance against a weight overfitted to noisy validation. Cost 0.00013 on the hidden test set. The weight surface is flat from 0.50 to 0.70, so there was nothing to protect against.</td>
-        </tr>
+      <tr class="grp"><td colspan="4">Borrowed from the AMEX 1st/2nd/3rd place solutions &mdash; 5 tried, 0 transferred</td></tr>
+      <tr class="row"><td class="exp">Recency windows &amp; within-customer ranks</td><td class="n down">&minus;0.00035</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00035"></span></div></td>
+        <td class="why">Last-3-month aggregates, last-3-vs-prior-3 contrasts, and rank-within-own-history. A real gap in our set &mdash; every aggregate we own spans all six months &mdash; but re-summarising information the model already had made it worse.</td></tr>
+      <tr class="row band"><td class="exp">Very high <code>min_data_in_leaf</code></td><td class="n down">&minus;0.00104</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00104"></span></div></td>
+        <td class="why">Credited as their main CV/leaderboard alignment lever at 2<sup>11</sup>. Degraded monotonically for us &mdash; because 2048 of their 458,913 rows is 0.45% per leaf, and our incumbent&rsquo;s 100 of 24,000 is 0.42%. We were already at their setting, stated as a ratio rather than a count.</td></tr>
+      <tr class="row"><td class="exp">DART boosting</td><td class="n down">&minus;0.00072</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00072"></span></div></td>
+        <td class="why">Their single best model, and explicitly against their own prior expectation. DART&rsquo;s benefit comes from having a long ensemble to drop trees from; at 19&times; fewer rows there is less ensemble to spare.</td></tr>
+      <tr class="row band"><td class="exp"><code>feature_fraction_bynode</code></td><td class="n down">&minus;0.00011</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00011"></span></div></td>
+        <td class="why">Per-split rather than per-tree feature sampling. Neutral-to-slightly-negative at both values tested.</td></tr>
+      <tr class="row"><td class="exp">Denoising &amp; rank blending</td><td class="n flat">n/a</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span></div></td>
+        <td class="why">Not applicable rather than unsuccessful. Their <code>floor(x*100)/100</code> recovers noise AMEX injected into float columns &mdash; ours are already integers. Rank blending optimises a rank-based metric; ranks discard calibration, which is precisely what log loss scores.</td></tr>
 
-        <tr class="grp"><td colspan="4">Data &amp; variance &mdash; 4 tried, 2 worked</td></tr>
-        <tr>
-          <td>Repeated cross-validation</td>
-          <td class="n up">+0.00093</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill pos" style="left:50%;width:74px;"></span></div></td>
-          <td class="why">Cumulative over six partitions. Pure variance reduction &mdash; structurally incapable of overfitting, since no selection is involved. Saturated after three partitions.</td>
-        </tr>
-        <tr>
-          <td>Full-data refit</td>
-          <td class="n up">&mdash;</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill pos" style="left:50%;width:34px;"></span></div></td>
-          <td class="why">Worth 0.00023 on the hidden test set and exactly zero on OOF, which cannot see it by construction. The clearest case of cross-validation understating a real gain.</td>
-        </tr>
-        <tr>
-          <td>Pseudo-labelling the test set</td>
-          <td class="n down">&minus;0.00024</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill neg" style="left:calc(50% - 33px);width:33px;"></span></div></td>
-          <td class="why">Degraded monotonically as pseudo-row weight rose, under a leak-free protocol. No tuning direction to rescue it.</td>
-        </tr>
-        <tr>
-          <td>Seed averaging, 1&nbsp;&rarr;&nbsp;12</td>
-          <td class="n flat">0.00000</td>
-          <td><div class="bar"><span class="zero"></span><span class="th" style="left:calc(50% + 69px);"></span><span class="fill nil" style="left:50%;width:2px;"></span></div></td>
-          <td class="why">Completely flat. This LightGBM configuration is already stable across seeds &mdash; unlike the neural nets, where seed averaging matters a great deal.</td>
-        </tr>
-      </tbody>
-    </table>
-    <div class="legend">
-      <span class="key"><span class="swatch" style="background:var(--win);"></span> improved</span>
-      <span class="key"><span class="swatch" style="background:var(--null);"></span> within noise</span>
-      <span class="key"><span class="swatch" style="background:var(--loss);"></span> regressed</span>
-      <span class="key"><span class="tick"></span> 0.0005 noise floor</span>
-      <span class="key">&mdash; = not measurable on OOF</span>
-    </div>
+      <tr class="grp"><td colspan="4">Structure &mdash; 3 splits tried, 0 helped</td></tr>
+      <tr class="row"><td class="exp">Segment models &mdash; by lateness</td><td class="n down">&minus;0.00225</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00225"></span></div></td>
+        <td class="why">Separate models for never-late / 1&ndash;2 / 3+ late months, where residual loss ranges 0.34 to 0.64. Each model early-stops on its own inner split, so small segments are not penalised for their size.</td></tr>
+      <tr class="row band"><td class="exp">Segment models &mdash; by credit limit</td><td class="n down">&minus;0.00134</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00134"></span></div></td>
+        <td class="why">The cleanest of the three: two nearly equal halves (12,223 / 11,777), so almost no data-size penalty to explain it away &mdash; and it still loses. The feature-to-risk relationship is shared across these populations; splitting only discards training rows.</td></tr>
+      <tr class="row"><td class="exp">Segment models &mdash; by card usage</td><td class="n down">&minus;0.00007</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00007"></span></div></td>
+        <td class="why">Never-used cards (1,716 customers) modelled apart from active ones. Exactly neutral.</td></tr>
+      <tr class="row band"><td class="exp">Blend weight shrinkage</td><td class="n down">&minus;0.00002</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00002"></span></div></td>
+        <td class="why">Pulling the fitted 0.65/0.35 halfway to uniform, as insurance against a weight overfitted to noisy validation. Cost 0.00013 on the hidden test set. The weight surface is flat from 0.50 to 0.70, so there was nothing to protect against.</td></tr>
+
+      <tr class="grp"><td colspan="4">Data &amp; variance &mdash; 4 tried, 2 worked</td></tr>
+      <tr class="row"><td class="exp">Repeated cross-validation</td><td class="n up">+0.00093</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill pos" style="--d:0.00093"></span></div></td>
+        <td class="why">Cumulative over six partitions. Pure variance reduction &mdash; structurally incapable of overfitting, since no selection is involved. Saturated after three partitions.</td></tr>
+      <tr class="row band"><td class="exp">Full-data refit</td><td class="n flat">&mdash;</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span></div></td>
+        <td class="why">Worth 0.00023 on the hidden test set and exactly zero on OOF, which cannot see it by construction. The clearest case of cross-validation understating a real gain.</td></tr>
+      <tr class="row"><td class="exp">Pseudo-labelling the test set</td><td class="n down">&minus;0.00024</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span><span class="fill neg" style="--d:0.00024"></span></div></td>
+        <td class="why">Degraded monotonically as pseudo-row weight rose, under a leak-free protocol. No tuning direction to rescue it.</td></tr>
+      <tr class="row band"><td class="exp">Seed averaging, 1 &rarr; 12</td><td class="n flat">0.00000</td>
+        <td><div class="bar"><span class="zero"></span><span class="th r"></span><span class="th l"></span></div></td>
+        <td class="why">Completely flat. This LightGBM configuration is already stable across seeds &mdash; unlike the neural nets, where seed averaging matters a great deal.</td></tr>
+
+    </tbody>
+  </table>
   </div>
+
+  <p class="legend">
+    <span><i style="background:var(--lgbm)"></i>improved</span>
+    <span><i style="background:var(--ink-3);opacity:.5"></i>within noise</span>
+    <span><i style="background:var(--red)"></i>regressed</span>
+    <span><i style="background:repeating-linear-gradient(90deg,var(--amber) 0 2px,transparent 2px 4px)"></i>0.0005 noise floor</span>
+    <span>&mdash; = not measurable on OOF</span>
+  </p>
 </section>
 
-<section>
-  <p class="eyebrow">Part three</p>
-  <h2>What the record actually shows</h2>
-  <p class="lede measure">Four patterns hold across all forty-one experiments, each supported by more than one independent result.</p>
+<section id="patterns">
+  <div class="sechead"><span class="no">3</span><h2>What the record actually shows</h2></div>
+  <p class="lede measure">Five patterns hold across all forty-one experiments, each supported by more than one independent result.</p>
 
   <div class="findings">
     <div class="finding">
       <h3>New information wins; new algorithms do not</h3>
-      <p>Ten model families were tried and three held blend weight &mdash; all three fixed early; the seven challenger families that followed held none. Seven feature families were tried and one worked &mdash; the one that recovered a quantity the dataset never stated. The distinction that predicts success is not sophistication but whether something enters the model that wasn't already expressible from the existing columns. Feeding the winning feature family to the winning architecture in a richer form changed nothing once the information itself was already present &mdash; it was never the representation doing the work.</p>
-      <span class="ev">7 challenger architectures &rarr; 0 kept &nbsp;&middot;&nbsp; 1 accounting identity &rarr; the largest gain of the project &nbsp;&middot;&nbsp; re-presenting that same information in sequence form &rarr; +0.00002</span>
+      <p>Ten model families were tried and three held blend weight &mdash; all three fixed early; the seven challenger families that followed held none. Seven feature families were tried and one worked &mdash; the one that recovered a quantity the dataset never stated. The distinction that predicts success is not sophistication but whether something enters the model that wasn&rsquo;t already expressible from the existing columns. Feeding the winning feature family to the winning architecture in a richer form changed nothing once the information itself was already present &mdash; it was never the representation doing the work.</p>
+      <p class="ev">7 challenger architectures &rarr; 0 kept<br>1 accounting identity &rarr; the largest gain of the project<br>re-presenting that same information in sequence form &rarr; +0.00002</p>
     </div>
     <div class="finding">
       <h3>Cross-validation understates feature gains and overstates everything else</h3>
       <p>The spending features improved OOF by 0.00046 and the hidden test set by 0.00173 &mdash; a 3.8&times; amplification. The sixth repeated-CV partition improved OOF by 0.00024 and the test set by nothing at all. Small OOF gains from averaging did not translate; gains from better features translated at more than triple their measured size.</p>
-      <span class="ev">features 3.8&times; amplified &nbsp;&middot;&nbsp; averaging tweaks 0&times;</span>
+      <p class="ev">features 3.8&times; amplified<br>averaging tweaks 0&times;</p>
     </div>
     <div class="finding">
       <h3>Decorrelation is necessary but nowhere near sufficient</h3>
-      <p>The intuition that an ensemble wants uncorrelated members is only half true. Logistic regression was the most decorrelated model produced all session, at 0.948 against LightGBM, and the optimal blend still assigned it exactly zero weight. The GRU earned 30% at a <em>higher</em> correlation of 0.9825. What matters is whether the disagreement is informative.</p>
-      <span class="ev">logreg 0.948 corr &rarr; weight 0.00 &nbsp;&middot;&nbsp; GRU 0.9825 corr &rarr; weight 0.30</span>
+      <p>The intuition that an ensemble wants uncorrelated members is only half true. Logistic regression was the most decorrelated model produced all session, at 0.948 against LightGBM, and the optimal blend still assigned it exactly zero weight. The GRU earned 30% at a higher correlation of 0.9825. What matters is whether the disagreement is informative.</p>
+      <p class="ev">logreg 0.948 corr &rarr; weight 0.00<br>GRU 0.9825 corr &rarr; weight 0.30</p>
     </div>
     <div class="finding">
       <h3>The hardest cases carry no signal at all</h3>
       <p>Residual analysis found the twenty worst-predicted customers were all defaulters the model rated at 2&ndash;4% risk &mdash; and every one had a spotless payment history: never late, moderate utilisation, healthy limits. Whatever caused those defaults is not observable in repayment status, balances, payments or demographics. Some portion of this problem is unreachable from this data.</p>
-      <span class="ev">worst 20 residuals: all clean histories, all defaulted</span>
+      <p class="ev">worst 20 residuals: all clean histories, all defaulted</p>
     </div>
     <div class="finding">
       <h3>Winning solutions transfer as reasoning, not as settings</h3>
-      <p>Five techniques were lifted from the top three finishers on a much larger credit-default competition and none improved anything. Their approach &mdash; brute-force thousands of aggregate features, then select &mdash; is the right answer to <em>their</em> problem: 190 anonymised columns whose meanings were unknown, and 458,913 rows to support the search. With 23 interpretable columns and 24,000 rows, the winning move was the opposite: derive one quantity by reasoning about what the columns mean.</p>
-      <span class="ev">their 2<sup>11</sup> min-leaf = 0.45% of rows &nbsp;&middot;&nbsp; our 100 = 0.42% &nbsp;&middot;&nbsp; same setting, different notation</span>
+      <p>Five techniques were lifted from the top three finishers on a much larger credit-default competition and none improved anything. Their approach &mdash; brute-force thousands of aggregate features, then select &mdash; is the right answer to their problem: 190 anonymised columns whose meanings were unknown, and 458,913 rows to support the search. With 23 interpretable columns and 24,000 rows, the winning move was the opposite: derive one quantity by reasoning about what the columns mean.</p>
+      <p class="ev">their 2<sup>11</sup> min-leaf = 0.45% of rows<br>our 100 = 0.42%<br>same setting, different notation</p>
     </div>
   </div>
 
-  <div class="note measure">
-    <strong>One methodological note worth keeping.</strong> Isotonic calibration initially appeared to be a large win &mdash; it was fitted on the same out-of-fold predictions it was then scored against, and a flexible monotonic function will happily absorb the noise in the rows judging it. Re-run with proper nested cross-validation it became the single worst result in the table. Every fitted combiner and every target-derived feature after that point was scored strictly out-of-fold.
+  <div class="callout measure">
+    <p><strong>One methodological note worth keeping.</strong> Isotonic calibration initially appeared to be a large win &mdash; it was fitted on the same out-of-fold predictions it was then scored against, and a flexible monotonic function will happily absorb the noise in the rows judging it. Re-run with proper nested cross-validation it became the single worst result in the table. Every fitted combiner and every target-derived feature after that point was scored strictly out-of-fold.</p>
   </div>
 </section>
 
-<footer>
-  <p>Final model: 0.45 &times; LightGBM over 81 engineered features + 0.30 &times; bidirectional GRU over the six-month payment panel + 0.25 &times; TabPFN, combined as a plain weighted average. 270 cross-validated fold fits plus 11 full-data refits; probabilities used uncalibrated, verified against a reliability diagram. Out-of-fold log&nbsp;loss 0.42136, hidden test 0.40982.</p>
+<footer class="doc-foot">
+  Final model: 0.45 &times; LightGBM over 81 engineered features + 0.30 &times; bidirectional GRU over the six-month payment panel + 0.25 &times; TabPFN, combined as a plain weighted average. 270 cross-validated fold fits plus 11 full-data refits; probabilities used uncalibrated, verified against a reliability diagram. Out-of-fold log loss 0.42136, hidden test 0.40982.
 </footer>
+
 </div>
+</main>
+
+<script src="assets/site.js"></script>
+</body>
+</html>

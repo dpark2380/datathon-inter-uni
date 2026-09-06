@@ -1,11 +1,19 @@
 # Documentation
 
-Two standalone HTML documents, openable in any browser.
+A three-page static site, served by GitHub Pages from this directory and
+openable directly in any browser. Every page carries the same sidebar, so any
+section of either document is one click away from anywhere.
 
 | File | Covers |
 |---|---|
-| `methodology-report.html` | What the final model is, how each component makes a prediction, how the blend weights were chosen, how we arrived at it, its strengths and weaknesses, and what was left untried at the deadline |
-| `experiment-ledger.html` | All 41 experiments with measured deltas against the 0.0005 noise threshold, and why each did or did not work |
+| `index.html` | Landing page: the result as a statement of accounts, what the two documents contain, disclosure, reproduction |
+| `methodology-report.html` | §1–§7. What the final model is, how each component makes a prediction, how the blend weights were chosen, how we arrived at it, its strengths and weaknesses, and what was left untried at the deadline |
+| `experiment-ledger.html` | §1–§3. All 41 experiments with measured deltas against the 0.0005 noise threshold, and why each did or did not work |
+| `assets/site.css` | Shared stylesheet. Light and dark, responsive, print-friendly |
+| `assets/site.js` | Sidebar: marks the section in view, opens as a drawer under 1040px |
+| `assets/figures/` | SHAP summary, two SHAP waterfalls, reliability diagram — copied from `../output/analysis/` |
+
+No build step. Edit the HTML and commit.
 
 Also published at:
 - Methodology report — https://claude.ai/code/artifact/c9d283fa-29a2-4d1b-9b4e-98b82503d115
