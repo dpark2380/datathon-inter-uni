@@ -6,5 +6,6 @@ dev = [
     "pandas>=3.0.5",
     "scikit-learn>=1.9.0",
     "shap>=0.52.0",
+    "tabpfn>=8.5.0",
     "torch>=2.14.0",
 ]
