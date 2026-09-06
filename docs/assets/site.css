@@ -20,6 +20,7 @@
   --serif:"Newsreader",Georgia,"Times New Roman",serif;
   --mono:"DM Mono",ui-monospace,"SF Mono",Menlo,monospace;
   --sidebar:264px;
+  --shell:1360px;
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
@@ -43,16 +44,21 @@ html{scroll-behavior:smooth;scroll-padding-top:24px;}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto;}}
 body{
   margin:0;background:var(--paper);color:var(--ink);
-  font-family:var(--serif);font-size:17px;line-height:1.66;
+  font-family:var(--serif);font-size:18px;line-height:1.66;
   font-optical-sizing:auto;
   -webkit-font-smoothing:antialiased;
 }
 
-/* ---------- sidebar ---------------------------------------------------- */
+/* ---------- shell: sidebar + document, centred as one sheet ------------- */
+
+.shell{
+  display:grid;grid-template-columns:var(--sidebar) minmax(0,1fr);
+  max-width:var(--shell);margin:0 auto;
+}
 
 .nav{
-  position:fixed;inset:0 auto 0 0;width:var(--sidebar);
-  border-right:1px solid var(--rule);background:var(--tint);
+  position:sticky;top:0;align-self:start;height:100vh;
+  border-right:1px solid var(--rule);background:var(--paper);
   overflow-y:auto;padding:26px 0 40px;z-index:40;
 }
 .nav .brand{display:block;padding:0 22px 18px;text-decoration:none;color:inherit;}
@@ -89,8 +95,8 @@ body{
 
 /* ---------- page shell -------------------------------------------------- */
 
-.page{margin-left:var(--sidebar);padding:0 clamp(20px,4vw,64px) 110px;}
-.wrap{max-width:900px;}
+.page{padding:0 clamp(20px,3.6vw,60px) 110px;}
+.wrap{max-width:960px;}
 .measure{max-width:66ch;}
 
 h1{font-size:clamp(30px,4vw,45px);line-height:1.06;letter-spacing:-.018em;
@@ -285,9 +291,12 @@ footer.doc-foot{margin-top:70px;padding-top:16px;border-top:1px solid var(--rule
 /* ---------- responsive --------------------------------------------------- */
 
 @media (max-width:1040px){
-  .nav{transform:translateX(-100%);transition:transform .18s ease;width:280px;}
+  .shell{display:block;}
+  .nav{position:fixed;inset:0 auto 0 0;width:280px;height:auto;
+    background:var(--tint);
+    transform:translateX(-100%);transition:transform .18s ease;}
   .nav.open{transform:translateX(0);box-shadow:0 0 40px rgba(0,0,0,.18);}
-  .page{margin-left:0;padding-top:56px;}
+  .page{padding-top:56px;}
   .navbtn{display:flex;align-items:center;gap:10px;position:fixed;top:0;left:0;
     right:0;height:46px;padding:0 16px;z-index:50;background:var(--paper);
     border:none;border-bottom:1px solid var(--rule);color:var(--ink);
