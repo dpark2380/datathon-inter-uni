@@ -1,16 +1,17 @@
-"""Interpretability + calibration diagnostics -- reporting only, no effect on
-the submission. Answers the brief's explicit "interpretability" and
-"calibration" callouts:
+"""Interpretability + calibration diagnostics for the shipped blend --
+reporting only, no effect on the submission.
 
-1. SHAP values on a LightGBM fold model: which features drive each
-   prediction, globally (summary plot) and for individual customers
-   (waterfall plots), per the credit-scoring XAI literature (Demajo et al.
-   2020) from the earlier survey.
-2. Reliability diagrams for the LightGBM, MLP, and blended OOF predictions:
-   does "30% predicted default" actually default ~30% of the time, per the
-   calibration-diagnostics literature (Röchner et al. 2024).
+Run after lgbm_model.py, seq_model.py and tabpfn_model.py. Writes two PNGs
+to output/analysis/:
 
-Run after lgbm_model.py/nn_model.py/blend.py. Writes PNGs to output/analysis/.
+1. SHAP plots on a LightGBM fold model: which features drive each
+   prediction, globally (summary plot) and for two individual customers
+   (waterfall plots).
+2. A reliability diagram for LightGBM, GRU, TabPFN and the final blend's
+   OOF predictions: does "30% predicted default" actually default ~30% of
+   the time?
+
+Answers the brief's explicit "interpretability" and "calibration" callouts.
 """
 
 from pathlib import Path
@@ -27,6 +28,7 @@ from common import OUT, folds, load
 from lgbm_model import PARAMS
 
 OUT_DIR = Path("output/analysis")
+WEIGHTS = {"lgbm": 0.45, "seq": 0.30, "tabpfn": 0.25}  # must match blend.py
 
 
 def shap_plots(X, y):
@@ -68,11 +70,12 @@ def shap_plots(X, y):
 
 
 def reliability_diagram(y):
-    models = {"lgbm": "oof_lgbm.npy", "nn": "oof_nn.npy"}
+    oof = {m: np.load(OUT / f"oof_{m}.npy") for m in WEIGHTS}
+    oof["blend"] = sum(w * oof[m] for m, w in WEIGHTS.items())
+
     plt.figure(figsize=(6, 6))
     plt.plot([0, 1], [0, 1], "k--", label="perfectly calibrated")
-    for name, fname in models.items():
-        p = np.load(OUT / fname)
+    for name, p in oof.items():
         frac_pos, mean_pred = calibration_curve(y, p, n_bins=10, strategy="quantile")
         plt.plot(mean_pred, frac_pos, marker="o", label=name)
     plt.xlabel("mean predicted probability (per decile bin)")
