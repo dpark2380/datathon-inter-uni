@@ -13,7 +13,7 @@ Also published at:
 
 ## Final result
 
-Hidden-test log loss **0.40982** from `submission_tabpfn6.csv`.
+Hidden-test log loss **0.40982** from `submissions/submission_tabpfn6.csv`.
 Ensemble: 0.45 LightGBM + 0.30 GRU + 0.25 TabPFN, plain weighted average of
 probabilities, no calibration or post-processing beyond clipping to
 [1e-4, 1-1e-4].

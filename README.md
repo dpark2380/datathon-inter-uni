@@ -4,7 +4,7 @@ Predicting the probability that a customer defaults on their next payment,
 scored on **binary log loss**. 24,000 labelled training customers, 6,000 in a
 hidden test set.
 
-**Final result: 0.40982** on the hidden test set, from `submission_tabpfn6.csv`.
+**Final result: 0.40982** on the hidden test set, from `submissions/submission_tabpfn6.csv`.
 
 ## The model
 
@@ -31,17 +31,17 @@ rebuilt without running any model. See `artifacts/tabpfn_6rep/README.md`.
 
 ```bash
 uv sync                          # installs everything in pyproject.toml
-uv run python model.py           # LightGBM        ~10 min
-uv run python seq_model.py       # GRU             ~50 min
-TABPFN_TOKEN="<token>" uv run python tabpfn_model.py   # TabPFN  ~1 h on Apple GPU
-uv run python blend.py           # weight search + writes the submission
+uv run python models/model.py           # LightGBM        ~10 min
+uv run python models/seq_model.py       # GRU             ~50 min
+TABPFN_TOKEN="<token>" uv run python models/tabpfn_model.py   # TabPFN  ~1 h on Apple GPU
+uv run python models/blend.py           # weight search + writes the submission
 ```
 
-`blend.py` writes `.output/predictions_blend.csv`. **That is the submitted
-file** — it reproduces `submission_tabpfn6.csv` exactly (verified: maximum
+`models/blend.py` writes `.output/predictions_blend.csv`. **That is the submitted
+file** — it reproduces `submissions/submission_tabpfn6.csv` exactly (verified: maximum
 absolute difference 0.0 across all 6,000 rows).
 
-Order matters: `blend.py` reads the vectors the three model scripts save.
+Order matters: `models/blend.py` reads the vectors the three model scripts save.
 
 ### TabPFN needs a token
 
@@ -59,12 +59,12 @@ Everything is deterministic given these:
 
 | Setting | Value | Where |
 |---|---|---|
-| Fold seed | `SEED = 0` | `common.py` |
-| Fold partitions | `REPEATS = range(6)` — 6 × 5-fold stratified | `common.py` |
-| LightGBM seeds | `(0, 1, 2)` per fold → 90 models | `model.py` |
-| GRU seeds | `range(5)` per fold → 150 models | `seq_model.py` |
-| TabPFN | 6 partitions → 30 fits, `n_estimators=4` | `tabpfn_model.py` |
-| Blend weights | searched on OOF log loss, 0.05 grid | `blend.py` |
+| Fold seed | `SEED = 0` | `models/common.py` |
+| Fold partitions | `REPEATS = range(6)` — 6 × 5-fold stratified | `models/common.py` |
+| LightGBM seeds | `(0, 1, 2)` per fold → 90 models | `models/model.py` |
+| GRU seeds | `range(5)` per fold → 150 models | `models/seq_model.py` |
+| TabPFN | 6 partitions → 30 fits, `n_estimators=4` | `models/tabpfn_model.py` |
+| Blend weights | searched on OOF log loss, 0.05 grid | `models/blend.py` |
 
 All three models additionally refit on all 24,000 rows and average that with
 the fold ensemble for the test predictions.
@@ -75,25 +75,25 @@ the fold ensemble for the test predictions.
 
 | File | Role |
 |---|---|
-| `common.py` | data loading, cleaning, 81-feature engineering, the shared CV splits |
-| `model.py` | LightGBM |
-| `seq_model.py` | bidirectional GRU over the 6-month panel |
-| `tabpfn_model.py` | TabPFN |
-| `blend.py` | weight search, calibration check, **writes the final submission** |
+| `models/common.py` | data loading, cleaning, 81-feature engineering, the shared CV splits |
+| `models/model.py` | LightGBM |
+| `models/seq_model.py` | bidirectional GRU over the 6-month panel |
+| `models/tabpfn_model.py` | TabPFN |
+| `models/blend.py` | weight search, calibration check, **writes the final submission** |
 
 **Analysis**
 
 | File | Role |
 |---|---|
-| `interpret.py` | SHAP explanations and the reliability diagram |
-| `fairness_audit.py` | per-subgroup calibration and ranking, by sex, education, marriage and age |
+| `models/interpret.py` | SHAP explanations and the reliability diagram |
+| `models/fairness_audit.py` | per-subgroup calibration and ranking, by sex, education, marriage and age |
 
 **Tested and rejected** — kept as a record of what was tried, not part of the
 pipeline. See `docs/experiment-ledger.html` for measured results.
 
-`nn_model.py` (MLP) · `cnn_model.py` · `attn_model.py` (transformer, never
-completed a full run) · `autoenc_model.py` · `multitask_model.py` ·
-`survival_model.py` · `seq_spend_model.py` · `pseudo_label.py`
+`models/nn_model.py` (MLP) · `models/cnn_model.py` · `models/attn_model.py` (transformer, never
+completed a full run) · `models/autoenc_model.py` · `models/multitask_model.py` ·
+`models/survival_model.py` · `models/seq_spend_model.py` · `models/pseudo_label.py`
 
 **Documentation** — `docs/`, and `artifacts/` for saved prediction vectors.
 

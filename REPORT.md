@@ -1,6 +1,6 @@
 # Final Methodology Report — Credit Default Prediction
 
-**Final leaderboard submission:** `submission_tabpfn6.csv`
+**Final leaderboard submission:** `submissions/submission_tabpfn6.csv`
 **Hidden-test binary log loss:** **0.40982** (first place 0.40967; margin 0.00015)
 **Cross-validated:** 0.42136 out-of-fold log loss, 0.79195 AUC, 24,000 rows
 
@@ -82,7 +82,7 @@ Deliberately **not** done, each for a stated reason:
   punishes mis-scoring them. Heavy-tailed amount columns are handled with
   `log1p` transforms inside feature engineering instead.
 - **No scaling for the tree model.** LightGBM is invariant to monotone
-  transforms. Scaling is applied only inside `seq_model.py`, fitted on training
+  transforms. Scaling is applied only inside `models/seq_model.py`, fitted on training
   folds only.
 - **No resampling or class weighting.** The 22.121% positive rate is the rate
   the test set is drawn from, and log loss rewards predicting it honestly.
@@ -163,7 +163,7 @@ Three properties of this design carried most of the weight:
   both invisible to out-of-fold scoring by construction: each OOF row is
   predicted only by its own fold's models, while every test row is predicted by
   the average of all of them, and OOF never involves a model refitted on 100% of
-  the data. This is documented inline in `common.py` and was confirmed on the
+  the data. This is documented inline in `models/common.py` and was confirmed on the
   leaderboard — the full-data refit is worth 0.00023 on the hidden test set and
   exactly zero on OOF.
 
@@ -373,11 +373,11 @@ state is required — the pipeline is plain scripts.
 | File | Role |
 |---|---|
 | `Data Cleaning.ipynb` | Produces `datasets/train_clean.csv` from `datasets/train.csv` (§4) |
-| `common.py` | Data loading, cleaning, the 81 features, shared fold splits, scoring, saving |
-| `model.py` | LightGBM: 90 fold fits + 3-seed full-data refit |
-| `seq_model.py` | GRU: 150 fold fits + 5-seed full-data refit |
-| `tabpfn_model.py` | TabPFN: 30 fold fits + 3-seed full-data refit |
-| `blend.py` | Weight-simplex search on OOF log loss, plus the nested-CV calibration check |
+| `models/common.py` | Data loading, cleaning, the 81 features, shared fold splits, scoring, saving |
+| `models/model.py` | LightGBM: 90 fold fits + 3-seed full-data refit |
+| `models/seq_model.py` | GRU: 150 fold fits + 5-seed full-data refit |
+| `models/tabpfn_model.py` | TabPFN: 30 fold fits + 3-seed full-data refit |
+| `models/blend.py` | Weight-simplex search on OOF log loss, plus the nested-CV calibration check |
 | `artifacts/tabpfn_6rep/README.md` | The exact rebuild recipe for the final file, from saved vectors |
 
 **Supporting code — experiments and analysis, not on the final path:**
@@ -385,27 +385,27 @@ state is required — the pipeline is plain scripts.
 | File | Role |
 |---|---|
 | `EDA.ipynb` | Exploratory analysis feeding the preprocessing decisions in §1.2 |
-| `nn_model.py` | MLP (weight 0.00 in the final blend) |
-| `seq_spend_model.py` | GRU with spending as a sequence channel (rejected, +0.00002) |
-| `cnn_model.py` | 1D-CNN over the same panel (weight 0.00) |
-| `attn_model.py` | Transformer encoder over the same panel (weight 0.00) |
-| `autoenc_model.py` | Supervised autoencoder (weight 0.00) |
-| `multitask_model.py` | Multi-task GRU with a next-month auxiliary head (weight 0.00) |
-| `survival_model.py` | Discrete-time hazard reformulation (weight 0.00 in the final blend) |
-| `pseudo_label.py` | Pseudo-labelling the test set — a recorded negative result |
-| `interpret.py` | SHAP attributions and the reliability diagram → `output/analysis/` |
+| `models/nn_model.py` | MLP (weight 0.00 in the final blend) |
+| `models/seq_spend_model.py` | GRU with spending as a sequence channel (rejected, +0.00002) |
+| `models/cnn_model.py` | 1D-CNN over the same panel (weight 0.00) |
+| `models/attn_model.py` | Transformer encoder over the same panel (weight 0.00) |
+| `models/autoenc_model.py` | Supervised autoencoder (weight 0.00) |
+| `models/multitask_model.py` | Multi-task GRU with a next-month auxiliary head (weight 0.00) |
+| `models/survival_model.py` | Discrete-time hazard reformulation (weight 0.00 in the final blend) |
+| `models/pseudo_label.py` | Pseudo-labelling the test set — a recorded negative result |
+| `models/interpret.py` | SHAP attributions and the reliability diagram → `output/analysis/` |
 | `main.py` | The earliest RandomForest baseline (0.43615). Superseded and **not** part of the final pipeline; retained only as the starting point of the progression in §1.7 |
 
 Every stage the PDF asks about is covered: data loading (`common.load`),
 preprocessing (`common.clean`, `Data Cleaning.ipynb`), feature generation
-(`common.features`, `seq_model.panel`), model training (`model.py`,
-`seq_model.py`, `tabpfn_model.py`), validation (`common.folds`, `common.score`),
+(`common.features`, `seq_model.panel`), model training (`models/model.py`,
+`models/seq_model.py`, `models/tabpfn_model.py`), validation (`common.folds`, `common.score`),
 test inference (each model's fold loop and full-data refit), post-processing (the
 clip in the rebuild recipe), and generation of the final submission file (§5).
 
 ## 3. Final Submission / Prediction File
 
-**`submission_tabpfn6.csv`** — 6,000 rows, columns `client_id` and
+**`submissions/submission_tabpfn6.csv`** — 6,000 rows, columns `client_id` and
 `prob_default`, mean predicted probability 0.2154 against a 22.121% training
 base rate.
 
@@ -418,11 +418,11 @@ It has, however, been **verified as reconstructible**. Applying the recipe in
 floating-point precision:
 
 ```
-max |reconstructed − submitted| = 9.7e-17    (submission_tabpfn6.csv)
-max |reconstructed − submitted| = 9.7e-17    (submission_tabpfn3.csv)
+max |reconstructed − submitted| = 9.7e-17    (submissions/submission_tabpfn6.csv)
+max |reconstructed − submitted| = 9.7e-17    (submissions/submission_tabpfn3.csv)
 ```
 
-The second-best submission, `submission_tabpfn3.csv` (0.40995), reconstructs
+The second-best submission, `submissions/submission_tabpfn3.csv` (0.40995), reconstructs
 exactly the same way from `artifacts/tabpfn_3rep/`. The other eleven
 `submission_*.csv` files in the repository are the earlier steps of the
 progression in §1.7 and are retained as the experimental record.
@@ -446,18 +446,18 @@ hours of retraining:
 ```
 artifacts/test_lgbm_full.npy                LightGBM test predictions (pure full-data refit)
 artifacts/test_seq.npy                      GRU test predictions
-artifacts/tabpfn_6rep/test_tabpfn_6rep.npy  TabPFN test predictions → submission_tabpfn6.csv (0.40982)
+artifacts/tabpfn_6rep/test_tabpfn_6rep.npy  TabPFN test predictions → submissions/submission_tabpfn6.csv (0.40982)
 artifacts/tabpfn_6rep/oof_tabpfn_6rep.npy   TabPFN out-of-fold predictions (OOF 0.42345)
 artifacts/tabpfn_6rep/tabpfn_model_6rep.py  The exact script that generated them
-artifacts/tabpfn_3rep/…                     The 3-repeat configuration → submission_tabpfn3.csv (0.40995)
+artifacts/tabpfn_3rep/…                     The 3-repeat configuration → submissions/submission_tabpfn3.csv (0.40995)
 ```
 
 ## 5. README / Reproduction Instructions
 
 ### Required files
 
-`datasets/train.csv`, `datasets/test.csv`, `common.py`, `model.py`,
-`seq_model.py`, `tabpfn_model.py`, `blend.py`, and `datasets/train_clean.csv`
+`datasets/train.csv`, `datasets/test.csv`, `models/common.py`, `models/model.py`,
+`models/seq_model.py`, `models/tabpfn_model.py`, `models/blend.py`, and `datasets/train_clean.csv`
 (or `Data Cleaning.ipynb` to regenerate it).
 
 ### Key dependencies
@@ -472,11 +472,11 @@ time via `uv run --with tabpfn` and is **not** in the lock file.
 | Setting | Value | Where |
 |---|---|---|
 | Fold splitter | `StratifiedKFold(5, shuffle=True, random_state=seed)` | `common.folds` |
-| Fold-partition seeds | `REPEATS = tuple(range(6))` — 6 partitions | `common.py` |
-| LightGBM model seeds | `SEEDS = (0, 1, 2)`, offset `seed + 100 * rep` | `model.py` |
-| GRU model seeds | `SEEDS = tuple(range(5))` | `seq_model.py` |
-| TabPFN seeds | `random_state=rep` per fold; `1000 + s` for the 3 refits | `tabpfn_model.py` |
-| Minimum-payment rate | `MIN_PAY_RATE = 0.10` | `common.py` |
+| Fold-partition seeds | `REPEATS = tuple(range(6))` — 6 partitions | `models/common.py` |
+| LightGBM model seeds | `SEEDS = (0, 1, 2)`, offset `seed + 100 * rep` | `models/model.py` |
+| GRU model seeds | `SEEDS = tuple(range(5))` | `models/seq_model.py` |
+| TabPFN seeds | `random_state=rep` per fold; `1000 + s` for the 3 refits | `models/tabpfn_model.py` |
+| Minimum-payment rate | `MIN_PAY_RATE = 0.10` | `models/common.py` |
 | Submission clip | `[1e-4, 1-1e-4]` | rebuild recipe below |
 
 ### Option A — rebuild the final submission without retraining (seconds)
@@ -494,12 +494,12 @@ preds = np.clip(0.45 * lgbm + 0.30 * seq + 0.25 * tab, 1e-4, 1 - 1e-4)
 ids = pd.read_csv("datasets/test.csv", usecols=["client_id"],
                   dtype={"client_id": str})["client_id"]
 pd.DataFrame({"client_id": ids, "prob_default": preds}) \
-  .to_csv("submission_tabpfn6.csv", index=False)
+  .to_csv("submissions/submission_tabpfn6.csv", index=False)
 ```
 
 > **The one thing that is easy to get wrong.** The LightGBM component is
 > `test_lgbm_full.npy`, the **pure full-data refit** — *not* `test_lgbm.npy`,
-> which is the 50/50 fold-ensemble/refit mix that `model.py` writes by default.
+> which is the 50/50 fold-ensemble/refit mix that `models/model.py` writes by default.
 > Substituting the latter produces a different and slightly worse file (0.41038
 > against 0.41032 when that change was tested in isolation). Note the asymmetry:
 > the GRU and TabPFN components *are* 50/50 mixes; only LightGBM is a pure refit.
@@ -507,13 +507,13 @@ pd.DataFrame({"client_id": ids, "prob_default": preds}) \
 ### Option B — retrain from scratch (~4 hours)
 
 ```bash
-uv run python model.py                                                # ~10 min → .output/test_lgbm_full.npy
-uv run python seq_model.py                                            # ~50 min → .output/test_seq.npy
-TABPFN_TOKEN="<token>" uv run --with tabpfn python tabpfn_model.py    # ~3h 10m → .output/test_tabpfn.npy
-uv run python blend.py                                                # weight search + submission
+uv run python models/model.py                                                # ~10 min → .output/test_lgbm_full.npy
+uv run python models/seq_model.py                                            # ~50 min → .output/test_seq.npy
+TABPFN_TOKEN="<token>" uv run --with tabpfn python models/tabpfn_model.py    # ~3h 10m → .output/test_tabpfn.npy
+uv run python models/blend.py                                                # weight search + submission
 ```
 
-Run in that order — `blend.py` and the correlation report in `tabpfn_model.py`
+Run in that order — `models/blend.py` and the correlation report in `models/tabpfn_model.py`
 read the `.npy` vectors the earlier scripts write. `Data Cleaning.ipynb` must be
 run first only if `datasets/train_clean.csv` is absent.
 
@@ -524,8 +524,8 @@ the vectors are committed.
 
 ### Which script generates the final prediction file
 
-`blend.py` writes `.output/predictions_blend.csv` on the retraining path. The
-submitted `submission_tabpfn6.csv` was produced by the explicit weighted average
+`models/blend.py` writes `.output/predictions_blend.csv` on the retraining path. The
+submitted `submissions/submission_tabpfn6.csv` was produced by the explicit weighted average
 in Option A above, recorded verbatim in `artifacts/tabpfn_6rep/README.md`.
 
 ## 6. Final Model Information
@@ -643,7 +643,7 @@ other than the pretrained TabPFN weights disclosed above.
 | Item | Where |
 |---|---|
 | Local validation scores | §1.5 (per model) and §1.6 (per blend); full set in `docs/experiment-ledger.html` |
-| Leaderboard score for the submitted file | 0.40982 for `submission_tabpfn6.csv` (§3); full progression in §1.7 |
+| Leaderboard score for the submitted file | 0.40982 for `submissions/submission_tabpfn6.csv` (§3); full progression in §1.7 |
 | Experiment / model comparison results | `docs/experiment-ledger.html` — all 41 experiments with measured deltas |
 | Saved model files | `artifacts/` — prediction vectors rather than model binaries, which is what makes the expensive TabPFN run reproducible in seconds (§4) |
 | Environment file | `uv.lock` (`pyproject.toml` for the top-level set); `tabpfn` supplied via `uv run --with tabpfn` |
@@ -657,9 +657,9 @@ The chain the PDF asks reviewers to verify:
 | competition data | `datasets/train.csv`, `datasets/test.csv` |
 | → preprocessing | `common.clean()` / `Data Cleaning.ipynb` → `datasets/train_clean.csv` |
 | → feature generation | `common.features()` → 81 features; `seq_model.panel()` → 6 × 8 panel |
-| → modelling | `model.py`, `seq_model.py`, `tabpfn_model.py` over `common.folds` |
+| → modelling | `models/model.py`, `models/seq_model.py`, `models/tabpfn_model.py` over `common.folds` |
 | → inference | fold ensembles + full-data refits → `artifacts/*.npy` |
 | → post-processing | `0.45/0.30/0.25` weighted average, clip to `[1e-4, 1-1e-4]` |
-| → final submission | `submission_tabpfn6.csv`, **hidden-test log loss 0.40982** |
+| → final submission | `submissions/submission_tabpfn6.csv`, **hidden-test log loss 0.40982** |
 
 Verified end to end: the recipe in §5 reproduces the submitted file to 9.7e-17.
