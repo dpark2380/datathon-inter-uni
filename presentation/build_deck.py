@@ -181,23 +181,50 @@ NOTES[1] = ("We're predicting each customer's probability of default next month,
             "0.45 LightGBM, 0.30 GRU, and 0.25 TabPFN.")
 
 # ===========================================================================
-# Slide 2 - Data Cleaning
+# Slide 2 - Data Cleaning (four-card layout: verified against models/common.py)
 s = add_slide()
 kicker(s, "Preparation")
 title(s, "Data Cleaning")
-add_bullets(s, MARGIN, Inches(1.9), Inches(6.0), Inches(3.6), [
-    "No missing values and no malformed rows in the raw data.",
-    "EDUCATION codes 0, 5, 6 grouped into \"other\", 290 rows.",
-    "MARRIAGE code 0 grouped into \"other\", 42 rows.",
-    "PAY status −1 and −2 kept as-is: paid-in-full and inactive account, not missing data.",
-    "No outlier removal, large balances/payments can be genuine risk signal.",
-    "No resampling or class weighting, preserves the true 22.12% base rate for calibration.",
-], size=16.5, gap_pt=9)
-picture_fit(s, os.path.join(CHARTS, "cleaning_flow.png"), Inches(7.5), Inches(2.1),
-             Inches(5.15), Inches(1.6))
-add_text(s, MARGIN, Inches(6.55), Inches(11.9), Inches(0.6),
-          "Preprocessing preserved meaningful financial states instead of applying generic cleaning steps.",
-          15, color=SECOND, italic=True)
+
+def data_card(x, y, w, h, num, heading, bullets, heading_color=TEXT):
+    card = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, h)
+    card.fill.solid(); card.fill.fore_color.rgb = SURFACE
+    card.line.color.rgb = RGBColor(0xD2, 0xD2, 0xD7); card.line.width = Pt(1)
+    card.adjustments[0] = 0.04
+    card.shadow.inherit = False
+    pad = Inches(0.22)
+    add_text(s, x + pad, y + Inches(0.14), Inches(1.0), Inches(0.5), num, 30, color=RGBColor(0xD2, 0xD2, 0xD7), bold=True)
+    add_text(s, x + pad, y + Inches(0.62), w - 2 * pad, Inches(0.4), heading, 17, color=heading_color, bold=True)
+    add_bullets(s, x + pad, y + Inches(1.05), w - 2 * pad, h - Inches(1.2), bullets, size=11.5, gap_pt=7)
+
+cw, ch, gx, gy = Inches(5.7), Inches(2.35), Inches(0.3), Inches(0.25)
+x1, x2 = MARGIN, MARGIN + cw + gx
+y1, y2 = Inches(1.75), Inches(1.75) + ch + gy
+
+data_card(x1, y1, cw, ch, "01", "Repayment Status", [
+    "PAY_0, PAY_2 through PAY_6 show months behind on payment.",
+    "-2 = no balance, -1 = paid in full, 0 = paid minimum amount.",
+    "Raw values stay untouched in the cleaned dataset, no grouping here.",
+    "Aggregate lateness features (pay_max, n_late, trend_pay) clip -2/-1/0 to 0 only.",
+    "ever_paid_full and never_used deliberately keep the original codes.",
+])
+data_card(x2, y1, cw, ch, "02", "Education", [
+    "1 = graduate school, 2 = university, 3 = high school, 4 = other (official codes).",
+    "Undocumented codes 0, 5, 6 folded into \"other\" (4), 290 rows.",
+    "Confirmed cost: \"other\" over-predicted about 61%, AUC 0.645 vs about 0.79 elsewhere.",
+    "The only subgroup where the model underperforms its own base rate.",
+], heading_color=RGBColor(0xCB, 0x38, 0x2D))
+data_card(x1, y2, cw, ch, "03", "Marriage", [
+    "1 = married, 2 = single, 3 = other (official codes).",
+    "Undocumented code 0 folded into \"other\" (3), 42 rows.",
+    "No confirmed fairness or accuracy issue for this group.",
+])
+data_card(x2, y2, cw, ch, "04", "What We Didn't Clean", [
+    "Zero missing values, no malformed rows, confirmed directly across all 24,000 rows.",
+    "No outlier removal: large balances and payments can be genuine risk signal.",
+    "No resampling or class weighting: preserves the true 22.12% base rate for calibration.",
+    "client_id dropped as a non-informative identifier.",
+])
 footer(s, 2)
 NOTES[2] = ("The data had no missing values and no malformed rows. Cleaning stayed deliberately "
             "narrow. EDUCATION codes 0, 5, and 6 got grouped into \"other\", 290 rows; MARRIAGE "
