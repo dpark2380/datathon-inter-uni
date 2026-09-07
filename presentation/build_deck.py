@@ -521,28 +521,39 @@ def appendix_slide(label, heading, bullets, size=16.5, bullet_width=None):
     add_bullets(s, MARGIN, Inches(1.8), width, Inches(5.2), bullets, size=size, gap_pt=10)
     return s
 
-appendix_slide("A1", "Model comparison and blend weights", [
-    "Ten model families tested; three earned blend weight (LightGBM 0.45, GRU 0.30, TabPFN 0.25).",
-    "Rejected at weight 0.00: survival/hazard (0.42260 OOF, worsened hidden test), sequence+spend "
-    "channel (0.42426), 1D-CNN (0.42601, 0.9924 correlated with GRU), autoencoder (0.42685), "
-    "MLP (0.42882), CatBoost, ExtraTrees, logistic regression, multi-task GRU.",
-    "135 LightGBM configurations across 3 sweeps (40 coarse, 60 fine, 1 blend-scored); best "
-    "challenger beat the incumbent by only 0.00004, well below the noise floor.",
+appendix_slide("A1", "Full hyperparameters & fit counts", [
+    "LightGBM (strongest single model; reads all 81 features as a flat snapshot): "
+    "learning_rate 0.03, num_leaves 12, max_depth 4, min_child_samples 100, reg_lambda 30.0, "
+    "feature_fraction 0.5, seeds (0,1,2), 90 fits + 3-seed refit.",
+    "GRU (reads six months in order; the only model tuned from scratch this project): "
+    "2-layer bi-GRU, hidden size 32, dropout 0.4, Adam lr 2e-3, batch 512, max epochs "
+    "120/patience 12, seeds range(5), 150 fits + 5-seed refit.",
+    "TabPFN (pretrained prior; zero parameters fit to this data): n_estimators 4, "
+    "balance_probabilities False, device cpu, context 19,200/fold, 30 fits + 3-seed refit.",
     "Correlation is not the selection criterion: logistic regression was the most decorrelated "
-    "model (0.948 vs. LightGBM) yet received weight 0.00. GRU earned 0.30 at a higher "
+    "model tested (0.948 vs. LightGBM) yet received weight 0.00. GRU earned 0.30 at a higher "
     "correlation of 0.983, what matters is whether disagreement carries signal.",
+    "Totals: 270 cross-validated fits plus 11 full-data refits stand behind each submitted "
+    "probability. TabPFN also requires a Prior Labs licence and API token.",
 ])
 
-appendix_slide("A2", "Full experiment ledger (41 experiments)", [
-    "10 model families, 7 candidate feature families, 135 LightGBM configurations, 8 "
-    "ensembling/calibration schemes, grouped as successful, neutral or harmful in "
-    "docs/experiment-ledger.html.",
-    "Survival model: +0.00027 OOF but worse hidden test (0.41044 vs. 0.41038), removed.",
-    "5 techniques from the AMEX Kaggle write-ups tested (DART, high min_data_in_leaf, "
-    "feature_fraction_bynode, recency-window aggregates, within-customer ranks), none adopted.",
-    "Next investigation is new information, not further tuning: e.g. whether EDUCATION "
-    "\"other\" is a genuinely homogeneous group.",
-])
+appendix_slide("A2", "41 experiments, grouped", [
+    "Successful (4): log-loss alignment + GRU added (0.41260); full-data refit for the GRU "
+    "(-0.00023); repeated CV, 3 -> 6 partitions (-0.00026); spending decomposition + tuned "
+    "GRU (-0.00173).",
+    "Other models & tuning, rejected: 135 LightGBM configs (best +0.00004); 1D-CNN, corr. "
+    "0.9924 w/ GRU (0.42601); autoencoder (0.42685); MLP (0.42882); CatBoost/ExtraTrees/"
+    "LogReg/multi-task GRU (weight 0.00); pseudo-labelling the test set (-0.00024).",
+    "Techniques from the AMEX Kaggle winners (5, none adopted): DART boosting (-0.00072); "
+    "high min_data_in_leaf, 2048 (-0.00104); feature_fraction_bynode (-0.00011); recency "
+    "windows / within-customer ranks (-0.00035); denoising / rank blending (not applicable).",
+    "Harmful, caught and reverted: survival/hazard model improved OOF by +0.00027 but hidden "
+    "test got worse (0.41044 vs. 0.41038 without it), dropped despite the OOF gain. Isotonic "
+    "calibration looked like the best result on OOF; was leakage (fit and scored on the same "
+    "rows); under nested CV became the single worst result (-0.00330).",
+    "Next investigation: whether the EDUCATION \"other\" codes are a genuinely homogeneous "
+    "group, or should be split.",
+], size=14.5)
 
 appendix_slide("A3", "Ensemble weight search and calibration", [
     "Grid search over ~230 valid weight triples (0.05 steps) on OOF log loss; nothing is fitted.",
@@ -600,26 +611,6 @@ appendix_slide("A7", "Operational thresholds and OOF vs. hidden-test gaps", [
     "False positive: unnecessary review, reduced credit or an adverse decision for a reliable "
     "customer. False negative: missed default, underestimated loss, missed early support.",
 ])
-
-appendix_slide("A8", "Full feature engineering breakdown, all six families", [
-    "01 Repayment Status History: pay_max/sum/mean/std (lateness stats), n_late/n_late2plus "
-    "(count late months), trend_pay, max_late_streak, recent_late, months_since_late, and "
-    "ever_paid_full/never_used (read from the original, uncollapsed PAY codes).",
-    "02 Credit Utilisation: util1-util6 (balance / limit each month), util_mean/max/trend, "
-    "avail_credit (limit minus the most recent bill).",
-    "03 Payment Coverage: payratio1-payratio5 (fraction of each bill actually paid), "
-    "payratio_mean/min, paid_full_months, n_zero_pay.",
-    "04 Levels & Momentum: bill_sum/mean/std, amt_sum/mean/std, bill_growth, amt_over_limit, "
-    "log_limit, restores the absolute scale the ratio families strip out, needed for the "
-    "neural models (trees are scale-invariant and don't need it).",
-    "05 Spending Decomposition (the largest gain of the project, +0.00046 OOF / +0.00173 "
-    "hidden test): spend_t = BILL_t - BILL_(t+1) + PAY_AMT_t, plus spend1-5, spend_mean/max/"
-    "std/trend, n_months_no_spend, spend_minus_paid, months_spend_gt_paid.",
-    "06 Minimum-Payment Behaviour: min_pay_ratio_mean/min (distance from the assumed 10% "
-    "minimum due), months_paid_about_min, months_paid_under_min.",
-    "Six additional feature families were tried and rejected; see the main Feature "
-    "Engineering slide for their measured deltas.",
-], size=14)
 
 prs.save(os.path.join(HERE, "finalist-presentation.pptx"))
 print("Saved", os.path.join(HERE, "finalist-presentation.pptx"))
