@@ -235,24 +235,77 @@ NOTES[2] = ("The data had no missing values and no malformed rows. Cleaning stay
             "columns became 81 engineered features.")
 
 # ===========================================================================
-# Slide 3 - Feature Engineering
+# Slide 3 - Feature Engineering (six-family card grid, verified against common.py)
 s = add_slide()
-kicker(s, "The largest single gain")
-title(s, "Feature Engineering")
-add_text(s, MARGIN, Inches(1.85), Inches(11.9), Inches(0.55),
-          "Statement balances and payments are given, monthly account activity is not.",
-          17, color=SECOND)
-picture_fit(s, os.path.join(CHARTS, "spend_proxy.png"), MARGIN, Inches(2.5),
-             Inches(11.9), Inches(1.9))
-add_text(s, MARGIN, Inches(4.55), Inches(6.2), Inches(0.9),
-          "A rising balance from new spending is a different risk story than one from missed "
-          "payments, this proxy tells them apart.", 15.5, color=TEXT)
-picture_fit(s, os.path.join(CHARTS, "feature_family_gains.png"), Inches(6.9), Inches(4.35),
-             Inches(5.7), Inches(2.75))
-add_text(s, MARGIN, Inches(5.65), Inches(6.2), Inches(1.1),
-          "+0.00046 OOF log loss  ·  +0.00173 hidden-test log loss.\n"
-          "Six other feature families never cleared the 0.0005 noise threshold.",
-          15.5, color=DARKBLUE, bold=True, line_spacing=1.2)
+kicker(s, "Six families, one standout")
+title(s, "Feature Engineering", size=32)
+add_text(s, MARGIN, Inches(1.35), Inches(11.9), Inches(0.35),
+          "23 raw columns became 81 features across six families.", 14.5, color=SECOND)
+
+def feature_card(x, y, w, h, num, heading, bullets, heading_color=TEXT, fill=SURFACE, border=None):
+    card = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, h)
+    card.fill.solid(); card.fill.fore_color.rgb = fill
+    card.line.color.rgb = border or RGBColor(0xD2, 0xD2, 0xD7)
+    card.line.width = Pt(1.5 if border else 1)
+    card.adjustments[0] = 0.05
+    card.shadow.inherit = False
+    pad = Inches(0.14)
+    add_text(s, x + pad, y + Inches(0.08), Inches(0.6), Inches(0.3), num, 16, color=RGBColor(0xD2, 0xD2, 0xD7), bold=True)
+    add_text(s, x + pad, y + Inches(0.34), w - 2 * pad, Inches(0.28), heading, 11.5, color=heading_color, bold=True)
+    add_bullets(s, x + pad, y + Inches(0.64), w - 2 * pad, h - Inches(0.7), bullets, size=8, gap_pt=4)
+    return card
+
+cw, chh, gx, gy = Inches(3.78), Inches(2.55), Inches(0.16), Inches(0.14)
+x1, x2, x3 = MARGIN, MARGIN + cw + gx, MARGIN + 2 * (cw + gx)
+y1 = Inches(1.85)
+y2 = y1 + chh + gy
+
+feature_card(x1, y1, cw, chh, "01", "Repayment Status History", [
+    "Worst and average lateness across the 6 months (pay_max, pay_mean).",
+    "Number of late months, and months 2+ behind (n_late, n_late2plus).",
+    "Trend: improving or worsening, plus longest late streak (trend_pay, max_late_streak).",
+    "How recently they were late, weighted to the last 2 months (recent_late, months_since_late).",
+    "Ever paid in full, or never used the card (ever_paid_full, never_used).",
+])
+feature_card(x2, y1, cw, chh, "02", "Credit Utilisation", [
+    "Share of the credit limit used up, each of the 6 months (util1-util6).",
+    "Average and peak usage, rising or falling (util_mean, util_max, util_trend).",
+    "Actual dollars of credit still available (avail_credit).",
+])
+feature_card(x3, y1, cw, chh, "03", "Payment Coverage", [
+    "Fraction of each month's bill actually paid off (payratio1-payratio5).",
+    "Average and worst month's payment coverage (payratio_mean, payratio_min).",
+    "Months paid in full, and months paid nothing (paid_full_months, n_zero_pay).",
+    "Hypothesis: paying a higher share each month predicts lower risk.",
+])
+feature_card(x1, y2, cw, chh, "04", "Levels & Momentum", [
+    "Calculated: total/average dollars billed and paid (bill_sum/mean, amt_sum/mean); "
+    "overall coverage (coverage_total); raw balance change (bill_growth); spend vs. "
+    "limit and a log-scaled limit (amt_over_limit, log_limit).",
+    "Used: fed to all three models identically, same 81-feature matrix. Restores "
+    "scale the ratio families strip out; trees don't need it, the GRU does.",
+])
+feature_card(x3, y2, cw, chh, "06", "Minimum-Payment Behaviour", [
+    "How close payments are to the assumed 10% minimum due, on average and at "
+    "worst (min_pay_ratio_mean/min).",
+    "Months paying only around the minimum, a sign of financial strain "
+    "(months_paid_about_min).",
+    "Months paying even less than the minimum due (months_paid_under_min).",
+])
+feature_card(x2, y2, cw, chh, "05", "Spending Decomposition",
+    ["spend_t = BILL_t - BILL_(t+1) + PAY_AMT_t",
+     "Estimated dollars spent each month, plus average, peak and trend "
+     "(spend1-spend5, spend_mean/max/trend).",
+     "Months where new spending outpaced repayment (spend_minus_paid, "
+     "months_spend_gt_paid).",
+     "Separates \"spent more\" from \"stopped paying\" as the reason a balance rises.",
+     "+0.00046 OOF / +0.00173 hidden test, the largest gain of the whole project.",
+    ], heading_color=DARKBLUE, fill=PALEBLUE, border=BLUE)
+
+add_text(s, MARGIN, y2 + chh + Inches(0.04), Inches(11.9), Inches(0.3),
+          "Six additional feature families were tried and rejected (behavioural signatures, "
+          "spend-as-sequence, interaction terms, peer-relative limit, velocity/acceleration, "
+          "target encoding); none cleared the 0.0005 noise threshold.", 10.5, color=SECOND)
 footer(s, 3)
 NOTES[3] = ("The data gives statement balances and payments, but never states what a customer "
             "actually spent. So we worked it out ourselves. New activity equals current bill "
