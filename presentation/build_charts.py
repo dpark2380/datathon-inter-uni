@@ -113,20 +113,23 @@ ax.text(8.85, 1.75, "New activity", ha="center", va="center", fontsize=12.5, col
 ax.text(8.85, 1.32, "spending / net\naccount-activity proxy", ha="center", va="center", fontsize=9, color=DARKBLUE)
 save(fig, "spend_proxy.png")
 
-# 3b. Feature-family improvement comparison
+# 3b. Feature-family improvement comparison (real OOF deltas, REPORT.md sec1.3)
 fig, ax = plt.subplots(figsize=(7.2, 3.2))
-families = ["Spending\nproxy", "Family B", "Family C", "Family D", "Family E", "Family F", "Family G"]
-deltas = [0.00173, 0.00031, 0.00022, 0.00018, 0.00011, 0.00006, -0.00004]
+families = ["Spend\ndecomposition", "Behavioural\nsignatures", "Spend as\nsequence",
+            "Interaction\nterms", "Peer-relative\nlimit", "Velocity /\nacceleration",
+            "Target\nencoding"]
+deltas = [0.00046, 0.00006, 0.00002, 0.00000, -0.00011, -0.00024, -0.00052]
 colors = [BLUE if d == max(deltas) else "#C7C7CC" for d in deltas]
 bars = ax.bar(families, [d * 1000 for d in deltas], color=colors, width=0.6)
 ax.axhline(0.5, color=SECOND, linestyle="--", linewidth=1)
 ax.text(6.5, 0.55, "noise threshold (0.0005)", ha="right", va="bottom", fontsize=9, color=SECOND)
-ax.set_ylabel("Hidden-test log loss improvement (×10⁻³)", fontsize=10)
+ax.set_ylabel("OOF log loss improvement (×10⁻³)", fontsize=10)
 ax.spines[["top", "right"]].set_visible(False)
-ax.tick_params(axis="x", labelsize=9.5)
+ax.tick_params(axis="x", labelsize=8.5)
 for b, d in zip(bars, deltas):
-    ax.text(b.get_x() + b.get_width() / 2, b.get_height() + (0.05 if d >= 0 else -0.15),
+    ax.text(b.get_x() + b.get_width() / 2, b.get_height() + (0.05 if d >= 0 else -0.05),
              f"{d:+.5f}", ha="center", va="bottom" if d >= 0 else "top", fontsize=8, color=TEXT)
+ax.set_ylim(-0.75, 0.62)
 save(fig, "feature_family_gains.png")
 
 # ---------------------------------------------------------------------------
