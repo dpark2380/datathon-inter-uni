@@ -1,33 +1,37 @@
-# Speaker Script: Stream 1, Credit Card Default
+# Speaker Notes: Stream 1, Credit Card Default
 
-Rebuilt to match `presentation/slide_plan.md` (eight main slides, about four minutes, then a three-minute Q&A from the appendix). The "final model and validation" slide from the plan is split into two here (The Models, then Validation & Results) at the user's request, for cleaner structure. This text is identical to the speaker notes saved on each slide in the Figma deck; the pptx (built before the split) still has the original seven-slide notes on its "Final Model & Validation" slide, so treat this file and the Figma deck as current for rehearsal.
+Matches the notes saved on each slide in `finalist-presentation.pptx`. Slide titles
+here are the plain on-slide titles (not sentence-style takeaways); the takeaway for
+each slide is spoken, not printed as the heading. Total spoken text lands at
+approximately four minutes across the eight slides; the appendix slides carry no
+timed notes and are presented only if a judge asks.
 
-| Slide | Budget | Seconds |
-|---|---|---|
-| 1. Overview | 0:00-0:20 | 20s |
-| 2. Data Cleaning | 0:20-0:50 | 30s |
-| 3. Feature Engineering | 0:50-1:30 | 40s |
-| 4. Experimentation | 1:30-2:15 | 45s |
-| 5. The Models | 2:15-2:38 | 23s |
-| 6. Validation & Results | 2:38-2:56 | 18s |
-| 7. Model Insights & Limitations | 2:56-3:41 | 45s |
-| 8. Real-World Application | 3:41-4:01 | 20s |
+| # | Title | Budget | Seconds |
+|---|---|---|---|
+| 1 | Overview | 0:00-0:20 | 20s |
+| 2 | Data Cleaning | 0:20-0:50 | 30s |
+| 3 | Feature Engineering | 0:50-1:30 | 40s |
+| 4 | Experimentation | 1:30-2:15 | 45s |
+| 5 | The Models | 2:15-2:38 | 23s |
+| 6 | Validation & Results | 2:38-2:56 | 18s |
+| 7 | Model Insights & Limitations | 2:56-3:41 | 45s |
+| 8 | Real-World Application | 3:41-4:01 | 20s |
 
 ---
 
-**1. Problem, approach and result (0:00, 20s)**
+**1. Overview (0:00, 20s)**
 
 > We're predicting each customer's probability of default next month, scored by binary log loss, so calibration matters as much as ranking. Twenty-four thousand labelled customers, six thousand held out, twenty-three raw columns, a 22.12 percent default rate. Our final hidden-test log loss is 0.40982, from a blend of 0.45 LightGBM, 0.30 GRU, and 0.25 TabPFN.
 
-**2. Data understanding and preparation (0:20, 30s)**
+**2. Data Cleaning (0:20, 30s)**
 
 > The data had no missing values and no malformed rows. Cleaning stayed deliberately narrow. EDUCATION codes 0, 5, and 6 got grouped into "other", 290 rows; MARRIAGE code 0 grouped into "other", 42 rows. We kept PAY status values of minus 1 and minus 2 as features, since they mean paid-in-full and inactive account, not missing data. No outlier removal, since large balances can be genuine signal. No resampling, since changing the 22 percent base rate would hurt calibration. Twenty-three raw columns became 81 engineered features.
 
-**3. The feature-engineering insight (0:50, 40s)**
+**3. Feature Engineering (0:50, 40s)**
 
 > The data gives statement balances and payments, but never states what a customer actually spent. So we worked it out ourselves. New activity equals current bill minus previous bill plus payment. That matters because a rising balance from new spending is a different risk story than a rising balance from missed payments. This one feature family improved out-of-fold log loss by 0.00046 and hidden-test log loss by 0.00173, the largest gain of the project. Six other feature families we tried never cleared our 0.0005 noise threshold.
 
-**4. Experimentation and decision-making (1:30, 45s)**
+**4. Experimentation (1:30, 45s)**
 
 > We ran 41 experiments across 10 model families, 7 feature families, and 135 LightGBM configurations. Only a handful of decisions actually moved the needle. We switched from AUC to log loss, added a GRU to preserve month-to-month order, added the spending decomposition, the biggest single jump, then added TabPFN. Score fell from 0.41260 to 0.40982. Plenty of experiments went nowhere. 135 LightGBM configs found nothing reliable, a 1D-CNN just duplicated the GRU's signal, a survival model improved out-of-fold but got worse on hidden test so we dropped it, and isotonic calibration looked great until nested cross-validation revealed it was leakage. Disagreement between models only helps when it carries real signal.
 
@@ -45,13 +49,13 @@ Rebuilt to match `presentation/slide_plan.md` (eight main slides, about four min
 
 **8. Real-World Application (3:41, 20s)**
 
-> These probabilities should support manual review, early customer assistance, limit monitoring, and portfolio prioritization, not function as an automatic approve or decline rule. A false positive means a reliable customer faces unnecessary friction; a false negative means a missed default and a missed chance to help early. Thresholds should come from business cost and review capacity, not the competition score. The honest limits: some defaults aren't predictable from this data, one subgroup is unreliable, and TabPFN adds licensing and compute cost for a small gain. The real finding: understanding the account mechanics and validating carefully mattered more than adding model complexity.
+> These probabilities should support manual review, early customer assistance, limit monitoring, and portfolio prioritization, not function as an automatic approve or decline rule. A false positive means a reliable customer faces unnecessary friction; a false negative means a missed default and a missed chance to help early. Thresholds should come from business cost and review capacity, not the competition score. Some defaults aren't predictable from this data, one subgroup is unreliable, and TabPFN adds licensing and compute cost for a small gain. Understanding the account mechanics and validating carefully mattered more than adding model complexity.
 
 ---
 
 ### Delivery notes
 
-- Total spoken text is timed to land at almost exactly 4:00 across the seven slides above; read it aloud once with a stopwatch and trim pacing (not content) if you run long.
-- Numbers to know cold without looking at a slide: **0.40982** (final), **0.00173** (spend-decomposition gain), **0.645** (the "other" AUC). Note: **62.7% / 34.3% / 31.2%** are not used in this version of the deck, since that worked-customer walkthrough was cut when the deck was rebuilt to slide_plan.md's seven-slide structure. Don't reference it live.
-- Everything cut from the main eight slides (full hyperparameters, all 41 experiments, the weight-search surface, calibration comparison, SHAP waterfalls, the full fairness table, reproducibility pipeline, disclosures) lives in the appendix slides at the end of the deck. Do not present them unless a judge asks; jump to the relevant one directly rather than paging through.
-- See `presentation/qa-prep.md` for prepared answers to the judging-panel questions listed in `slide_plan.md`.
+- Numbers to know cold without looking at a slide: **0.40982** (final), **0.00173** (spend-decomposition gain), **0.645** (the "other" AUC).
+- Everything cut from the eight main slides (full hyperparameters, all 41 experiments, the weight-search surface, calibration comparison, SHAP waterfalls, the full fairness table, reproducibility pipeline, disclosures) lives in the appendix slides (A1-A7) at the end of the deck. Jump to the relevant one directly if a judge asks rather than paging through.
+- See `presentation/qa-prep.md` for prepared answers to the judging-panel questions listed in `slide_plan.md`, each tagged with the appendix slide that backs it up.
+- This file mirrors `presentation/script.md` in content. `script.md` is the presenter's own rehearsal copy with its own section headers; this file is the deliverable synced word-for-word to the notes saved in `finalist-presentation.pptx`.
