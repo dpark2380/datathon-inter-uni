@@ -223,7 +223,7 @@ data_card(x2, y2, cw, ch, "04", "What We Didn't Clean", [
     "Zero missing values, no malformed rows, confirmed directly across all 24,000 rows.",
     "No outlier removal: large balances and payments can be genuine risk signal.",
     "No resampling or class weighting: preserves the true 22.12% base rate for calibration.",
-    "client_id dropped as a non-informative identifier.",
+    "client_id excluded from the feature matrix (not predictive), kept for the submission's ID column.",
 ])
 footer(s, 2)
 NOTES[2] = ("The data had no missing values and no malformed rows. Cleaning stayed deliberately "
@@ -547,6 +547,26 @@ appendix_slide("A7", "Operational thresholds and OOF vs. hidden-test gaps", [
     "False positive: unnecessary review, reduced credit or an adverse decision for a reliable "
     "customer. False negative: missed default, underestimated loss, missed early support.",
 ])
+
+appendix_slide("A8", "Full feature engineering breakdown, all six families", [
+    "01 Repayment Status History: pay_max/sum/mean/std (lateness stats), n_late/n_late2plus "
+    "(count late months), trend_pay, max_late_streak, recent_late, months_since_late, and "
+    "ever_paid_full/never_used (read from the original, uncollapsed PAY codes).",
+    "02 Credit Utilisation: util1-util6 (balance / limit each month), util_mean/max/trend, "
+    "avail_credit (limit minus the most recent bill).",
+    "03 Payment Coverage: payratio1-payratio5 (fraction of each bill actually paid), "
+    "payratio_mean/min, paid_full_months, n_zero_pay.",
+    "04 Levels & Momentum: bill_sum/mean/std, amt_sum/mean/std, bill_growth, amt_over_limit, "
+    "log_limit, restores the absolute scale the ratio families strip out, needed for the "
+    "neural models (trees are scale-invariant and don't need it).",
+    "05 Spending Decomposition (the largest gain of the project, +0.00046 OOF / +0.00173 "
+    "hidden test): spend_t = BILL_t - BILL_(t+1) + PAY_AMT_t, plus spend1-5, spend_mean/max/"
+    "std/trend, n_months_no_spend, spend_minus_paid, months_spend_gt_paid.",
+    "06 Minimum-Payment Behaviour: min_pay_ratio_mean/min (distance from the assumed 10% "
+    "minimum due), months_paid_about_min, months_paid_under_min.",
+    "Six additional feature families were tried and rejected; see the main Feature "
+    "Engineering slide for their measured deltas.",
+], size=14)
 
 prs.save(os.path.join(HERE, "finalist-presentation.pptx"))
 print("Saved", os.path.join(HERE, "finalist-presentation.pptx"))
